@@ -51,6 +51,7 @@
     speed: () => [523, 784, 1046, 1568].forEach((f, i) => tone(f, f * 1.06, 0.07, "square", 0.05, i * 0.045)),
     speedEnd: () => tone(700, 300, 0.25, "triangle", 0.05),
     slime: () => { tone(200, 70, 0.22, "square", 0.05); tone(120, 60, 0.3, "triangle", 0.08, 0.04); },
+    timeUp: () => [784, 523, 392].forEach((f, i) => tone(f, f, 0.16, "triangle", 0.06, i * 0.16)),
     fanfare: () => [523, 659, 784, 659, 784, 1046].forEach((f, i) => tone(f, f, i === 5 ? 0.5 : 0.14, "square", 0.05, i * 0.15)),
   };
 

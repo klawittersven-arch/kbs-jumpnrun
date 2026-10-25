@@ -96,6 +96,8 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     }
     await until(() => teacher.evaluate(() => window.__teacher.room.players.length === 4), 5000, "Anmeldungen");
     ok(true, "vier Namen am Beamer");
+    // Jonas bekommt ein kurzes Zeitlimit (15 statt 120 Sekunden) und schafft das Ziel darin nicht
+    await phones[3].evaluate(() => { window.JRE.QUALI_FRAMES = 900; window.JRE.QUALI_WARN = 300; });
     // alle starten; verschieden lange Pausen, damit die Zeiten verschieden sind
     for (let i = 0; i < 4; i++) {
       await phones[i].click("#btnGo");
@@ -111,21 +113,33 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     const stopJump = jumping(phones);
     await sleep(2500);
     await shot(phones[0], "3-handy-quali");
-    await until(() => teacher.evaluate(() => window.__teacher.room.players.filter((p) => p.total != null).length === 4), 60000, "alle im Ziel");
+    const msgOf = (p) => p.evaluate(() => document.querySelector("#msg").textContent);
+    await until(async () => /Noch \d+ Sekunde/.test(await msgOf(phones[3])), 20000, "Countdown bei Jonas");
+    ok(true, "kurz vor Ablauf der Zeit zählt am Handy ein Countdown");
+    await shot(phones[3], "3b-handy-countdown");
+    await until(async () => /Zeit um!/.test(await msgOf(phones[3])), 12000, "Zeit um bei Jonas");
+    ok(/der Strecke/.test(await msgOf(phones[3])), "nach Ablauf der Zeit: „Zeit um!“ mit der geschafften Strecke");
+    await until(() => teacher.evaluate(() => window.__teacher.room.players.filter((p) => p.status === "done").length === 4), 60000, "alle fertig");
     stopJump();
     for (const p of phones) await p.keyboard.up("ArrowRight");
-    const quali = await teacher.evaluate(() => window.__teacher.room.players.map((p) => ({ n: p.name, t: p.total, r: p.rank })));
-    ok(quali.every((q) => q.t > 600), "alle Zeiten sind am Beamer angekommen", quali);
-    await until(() => phones[3].evaluate(() => window.__student.screen === "result"), 8000, "Ergebnis am Handy");
-    ok(await phones[3].locator(".result-time").isVisible(), "das Handy zeigt die eigene Zeit und den Platz");
+    const quali = await teacher.evaluate(() => window.__teacher.room.players.map((p) => ({ n: p.name, t: p.total, pr: p.prog, r: p.rank })));
+    ok(quali.slice(0, 3).every((q) => q.t > 600 && q.r <= 3), "drei Zeiten sind am Beamer angekommen", quali);
+    ok(quali[3].t === null && quali[3].pr > 0.1 && quali[3].pr < 1 && quali[3].r === 4, "Jonas steht mit seiner Strecke hinter allen im Ziel", quali[3]);
+    ok(await teacher.locator(".ranking li.timeup").count() === 1 && /zeit um\s*\d+\s*%/i.test(await teacher.locator(".ranking li.timeup").innerText()), "am Beamer steht bei Jonas „Zeit um“ mit Prozent");
+    await until(() => phones[2].evaluate(() => window.__student.screen === "result"), 8000, "Ergebnis am Handy");
+    ok(await phones[2].locator(".result-time").isVisible(), "das Handy zeigt die eigene Zeit und den Platz");
+    await until(() => phones[3].evaluate(() => window.__student.screen === "result" && /Platz 4/.test(document.querySelector("#panel").textContent)), 8000, "Ergebnis bei Jonas");
+    ok(/Zeit um!/.test(await phones[3].locator("#panel h2").innerText()) && /%/.test(await phones[3].locator(".result-time").innerText()), "Jonas sieht „Zeit um!“, seine Strecke und den Platz");
     await shot(teacher, "4-beamer-zeiten");
-    await shot(phones[3], "5-handy-ergebnis");
+    await shot(phones[2], "5-handy-ergebnis");
+    await shot(phones[3], "5b-handy-zeit-um");
 
     console.log("\n== Finale mit vier Spielern im gemeinsamen Level");
     await teacher.click("#btnFinal");
     await until(() => teacher.evaluate(() => window.__teacher.screen === "final-setup"), 5000, "Finale einrichten");
     const fs0 = await teacher.evaluate(() => window.__teacher.room.final);
     ok(fs0.p.length === 4 && fs0.shared === true, "vier Finalisten vorausgewählt, gemeinsames Level an");
+    ok(fs0.names[3] === "Jonas B.", "Jonas ist über seine Strecke ins Finale gekommen", fs0.names);
     await until(() => teacher.evaluate(() => !document.querySelector("#btnStart").disabled), 5000, "Start bereit");
     await shot(teacher, "6-beamer-finale-einrichten");
     await until(() => phones[1].evaluate(() => window.__student.screen === "invite"), 5000, "Einladung");

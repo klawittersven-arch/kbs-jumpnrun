@@ -109,8 +109,8 @@
     }
     if (me.status === "done") { U.store(resKey(), null); return renderResult(); }
     const res = U.store(resKey());
-    if (res && res.frames && you.quali && res.lv === you.quali.lv) {
-      net.send({ t: "result", frames: res.frames, splits: res.splits, deaths: res.deaths, lv: res.lv }, true);
+    if (res && (res.frames || res.timeUp) && you.quali && res.lv === you.quali.lv) {
+      sendResult(res);
       return renderResult(res);
     }
     if (you.phase !== "quali") return renderWait();
@@ -122,6 +122,7 @@
   function setPanel(html) { panel.innerHTML = html; panel.hidden = false; gameEl.hidden = true; }
   function figure(color, size) { const c = G.portrait(color || 0, false); const cv = document.createElement("canvas"); cv.width = c.width; cv.height = c.height; cv.getContext("2d").drawImage(c, 0, 0); if (size) cv.style.width = size; return cv; }
   const roundsTxt = (n) => n + " " + (n === 1 ? "Runde" : "Runden");
+  const LIMIT_MIN = Math.round(E.QUALI_FRAMES / 3600), LIMIT_TXT = "höchstens " + LIMIT_MIN + " Minuten";
 
   function renderCodeEntry(err) {
     screen = "code";
@@ -160,7 +161,7 @@
     const q = you.quali;
     setPanel(`<form class="card" id="nameForm" novalidate>
       <h2>Qualifying</h2>
-      <p><strong>${esc(q.name)}</strong> · ${roundsTxt(q.rounds)}. Du spielst allein gegen die Uhr, deine Zeit erscheint am Beamer. Du hast einen Versuch.</p>
+      <p><strong>${esc(q.name)}</strong> · ${roundsTxt(q.rounds)}. Du spielst allein gegen die Uhr, deine Zeit erscheint am Beamer. Du hast einen Versuch und ${LIMIT_TXT}.</p>
       <div class="row">
         <div class="field grow"><label for="inFirst">Vorname</label><input id="inFirst" autocomplete="given-name" maxlength="16" value="${esc(form.first)}" required></div>
         <div class="field initial"><label for="inInit">Nachname</label><input id="inInit" maxlength="1" autocapitalize="characters" autocomplete="off" value="${esc(form.initial)}" placeholder="K" required></div>
@@ -191,21 +192,30 @@
       <p class="eyebrow">Qualifying · ${esc(q.name)} · ${roundsTxt(q.rounds)}</p>
       <h2>Bereit, ${esc(you.me.name)}?</h2>
       <p>${q.rounds > 1 ? `Du läufst das Level ${q.rounds}-mal hintereinander. ` : ""}Die Uhr startet nach dem Countdown und stoppt an der letzten Fahne. Wer erwischt wird oder abstürzt, beginnt das Level von vorn, die Uhr läuft weiter.</p>
+      <p>Du hast ${LIMIT_TXT}. Bist du dann noch nicht im Ziel, zählt, wie weit du gekommen bist.</p>
       <p class="hint">${touch ? "Gehen mit dem Steuerkreuz, springen mit „Springen“. Länger drücken springt höher." : "Gehen mit ← und →, springen mit der Leertaste. Länger drücken springt höher."}</p>
       <button class="big-btn" id="btnGo">Start</button></div>`);
     $("#btnGo").onclick = () => { A.ensure(); startQuali(); };
   }
   function renderResult(local) {
     screen = "result";
-    const me = you && you.me, frames = me && me.total != null ? me.total : local && local.frames;
-    const sent = me && me.status === "done";
+    const me = you && you.me, sent = me && me.status === "done";
+    const timeUp = sent ? me.total == null : !!(local && local.timeUp);
+    const frames = me && me.total != null ? me.total : local && local.frames;
+    const prog = me && me.prog != null ? me.prog : local && local.progress;
     const splits = local && local.splits;
+    const what = timeUp ? "Deine Strecke" : "Deine Zeit";
     setPanel(`<div class="card result">
-      <h2>Ziel!</h2>
-      <div class="result-time">${P.fmt(frames)}</div>
-      ${splits && splits.length ? `<ol class="laplist">${splits.map((t, i) => `<li><span>Runde ${i + 1}</span><span>${P.fmt(t)}</span></li>`).join("")}<li><span>Ziel</span><span>${P.fmt(frames)}</span></li></ol>` : ""}
-      <p class="sendstate ${sent ? "ok" : ""}">${sent ? `Deine Zeit ist am Beamer angekommen.${me.rank ? ` Du bist gerade auf <strong>Platz ${me.rank}</strong> von ${me.of}.` : ""}` : "Deine Zeit wird gesendet …"}</p>
-      <p>Lass die Seite offen. Die Schnellsten spielen gleich das Finale.</p></div>`);
+      <h2>${timeUp ? "Zeit um!" : "Ziel!"}</h2>
+      ${timeUp ? `<div class="result-time">${P.pctHtml(prog)}</div><p>So viel der Strecke hast du in ${LIMIT_MIN} Minuten geschafft.</p>`
+        : `<div class="result-time">${P.fmt(frames)}</div>`}
+      ${!timeUp && splits && splits.length ? `<ol class="laplist">${splits.map((t, i) => `<li><span>Runde ${i + 1}</span><span>${P.fmt(t)}</span></li>`).join("")}<li><span>Ziel</span><span>${P.fmt(frames)}</span></li></ol>` : ""}
+      <p class="sendstate ${sent ? "ok" : ""}">${sent ? `${what} ist am Beamer angekommen.${me.rank ? ` Du bist gerade auf <strong>Platz ${me.rank}</strong> von ${me.of}.` : ""}` : what + " wird gesendet …"}</p>
+      <p>Lass die Seite offen. Die Besten spielen gleich das Finale.</p></div>`);
+  }
+  function sendResult(r) {
+    if (r.timeUp) net.send({ t: "result", timeUp: true, progress: r.progress, splits: r.splits, deaths: r.deaths, lv: r.lv }, true);
+    else net.send({ t: "result", frames: r.frames, splits: r.splits, deaths: r.deaths, lv: r.lv }, true);
   }
   function others(f) {
     return f.names.map((n, i) => `<li><span class="dot c${i}"></span> <span class="cname c${i}">${esc(n)}</span>${i === f.slot ? " (du)" : ""}</li>`).join("");
@@ -217,7 +227,7 @@
       <h2>Du bist im Finale!</h2>
       <div class="me-fig" id="meFig"></div>
       <p>Deine Farbe: <strong class="cname c${f.slot}">${esc(COLOR_NAMES[f.slot])}</strong>. ${f.stageNames.length > 1 ? "Gespielt werden zwei Level hintereinander, wer zuerst an der letzten Fahne ist, gewinnt." : "Gespielt wird ein Level, wer zuerst an der Fahne ist, gewinnt."}
-      Nach 5 Minuten ist Schluss, dann gewinnt, wer vorne liegt.
+      Nach 2 Minuten ist Schluss: 10 Sekunden vorher beginnt ein Countdown, dann gewinnt, wer dem Ziel am nächsten gekommen ist.
       ${f.shared ? "Alle laufen im selben Level: Münzen, Blöcke und Gegner gelten für alle, aber niemand kann dich blockieren." : "Jede und jeder läuft im eigenen Level, die anderen siehst du als Geister."}</p>
       <ul class="flist">${others(f)}</ul>
       <p class="hint">Das Finale startet, sobald deine Lehrkraft am Beamer auf „Finale starten“ drückt. Lass die Seite offen.</p></div>`);
@@ -229,7 +239,7 @@
     const me = you && you.me;
     setPanel(`<div class="card">
       <h2>Das Finale läuft am Beamer</h2>
-      <p>${me && me.total != null ? `Deine Qualifying-Zeit: <strong>${P.fmt(me.total)}</strong>${me.rank ? ` · Platz ${me.rank} von ${me.of}` : ""}. ` : ""}Schau nach vorn und feuere die Finalisten an!</p>
+      <p>${me && me.status === "done" ? `Dein Qualifying: <strong>${me.total != null ? P.fmt(me.total) : P.pct(me.prog) + " der Strecke"}</strong>${me.rank ? ` · Platz ${me.rank} von ${me.of}` : ""}. ` : ""}Schau nach vorn und feuere die Finalisten an!</p>
       ${you.winner ? `<p>Gewonnen hat <strong>${esc(you.winner)}</strong>.</p>` : ""}</div>`);
   }
   function renderFinalResult(f) {
@@ -237,11 +247,11 @@
     screen = "final-result";
     const place = f.place.indexOf(f.slot) + 1, win = place === 1;
     setPanel(`<div class="card result">
-      ${f.timeUp ? '<p class="eyebrow">Zeit um: nach 5 Minuten gewinnt, wer vorne liegt</p>' : ""}
+      ${f.timeUp ? '<p class="eyebrow">Zeit um: nach 2 Minuten gewinnt, wer dem Ziel am nächsten gekommen ist</p>' : ""}
       <h2>${win ? "Gewonnen!" : place ? "Platz " + place : "Finale beendet"}</h2>
       <div class="me-fig" id="meFig"></div>
-      <p>${f.fin[f.slot] != null ? `Deine Zeit: <strong>${P.fmt(f.fin[f.slot])}</strong>` : "Du warst noch nicht an der letzten Fahne."}</p>
-      ${!win && f.place.length ? `<p>Gewonnen hat <strong class="cname c${f.place[0]}">${esc(f.names[f.place[0]])}</strong>${f.fin[f.place[0]] != null ? " in " + P.fmt(f.fin[f.place[0]]) : ""}.</p>` : ""}
+      <p>${f.fin[f.slot] != null ? `Deine Zeit: <strong>${P.fmt(f.fin[f.slot])}</strong>` : `Du warst noch nicht an der letzten Fahne.${f.prog ? ` Geschafft: <strong>${P.pctHtml(f.prog[f.slot])}</strong> der Strecke.` : ""}`}</p>
+      ${!win && f.place.length ? `<p>Gewonnen hat <strong class="cname c${f.place[0]}">${esc(f.names[f.place[0]])}</strong>${f.fin[f.place[0]] != null ? " in " + P.fmt(f.fin[f.place[0]]) + "." : ""}</p>` : ""}
       <p>Die Siegerehrung siehst du am Beamer.</p></div>`);
     $("#meFig").appendChild(figure(f.slot, "84px"));
   }
@@ -277,25 +287,34 @@
     const plan = Array(q.rounds).fill(0), qlvNow = q.lv;
     showGame();
     screen = "playing";
-    let result = null, endT = 0;
+    // Zeitlimit beim Start lesen (die Tests verkürzen es)
+    const limit = E.QUALI_FRAMES, warn = limit - (E.QUALI_FRAMES - E.QUALI_WARN);
+    let result = null, endT = 0, lastLimit = 0;
+    const keep = (r) => {
+      result = Object.assign({}, r, { splits: r.splits.filter((x) => x != null), lv: qlvNow });
+      U.store(resKey(), result);
+      sendResult(result);
+    };
     const R = P.localRace({
-      stages: [stage], plan, view, color: 0,
-      onFinish: (r) => {
-        result = { frames: r.frames, splits: r.splits.filter((x) => x != null), deaths: r.deaths, lv: qlvNow };
-        U.store(resKey(), result);
-        net.send({ t: "result", frames: result.frames, splits: result.splits, deaths: result.deaths, lv: result.lv }, true);
-      },
+      stages: [stage], plan, view, color: 0, limit,
+      onFinish: keep,
+      onTimeUp: keep,
       onTick: (m, rec, st) => {
         hTime.textContent = P.fmt(st.phase === "count" ? 0 : result ? result.frames : m.frame);
         hInfo.innerHTML = `${esc(q.name)}<br><b>Runde ${Math.min(rec.k + 1, plan.length)}/${plan.length}</b>`;
+        const left = result ? 0 : P.limitCountdown(m.frame, limit, warn);
+        if (left > 0 && left !== lastLimit && st.phase === "run") A.SFX.count();
+        lastLimit = left;
         if (st.phase === "count") say(String(Math.ceil(st.count / 60)), "Gleich geht's los");
         else if (m.frame < 40) say("Los!", "");
+        else if (result && result.timeUp) msgEl.innerHTML = `<div class="big gold">Zeit um!</div><div class="sub">Geschafft: ${P.pctHtml(result.progress)} der Strecke</div>`;
         else if (result) say("Ziel!", P.fmt(result.frames), true);
+        else if (left > 0) say(String(left), "Noch " + left + (left === 1 ? " Sekunde" : " Sekunden"));
         else if (P.speedNews(rec)) say("Speed!", "", true);
         else if (rec.down) say("", "Nochmal von vorn, die Uhr läuft weiter");
         else msgEl.innerHTML = "";
-        if (st.phase === "over" && !endT) endT = performance.now();
-        if (endT && performance.now() - endT > 1200) { stopRace(); renderResult(result); update(); }
+        if ((st.phase === "over" || st.phase === "timeup") && !endT) endT = performance.now();
+        if (endT && performance.now() - endT > (st.phase === "timeup" ? 2500 : 1200)) { stopRace(); renderResult(result); update(); }
       },
     });
     race = { kind: "quali", stop: () => R.stop() };
@@ -341,7 +360,8 @@
       if (race.waitLogs) say("", "Verbinde …");
       else if (limit < 0) {
         const lead = P.standings(m)[0];
-        say("Zeit um!", lead.slot === slot ? "Du liegst vorne!" : f.names[lead.slot] + " liegt vorne", true);
+        msgEl.innerHTML = `<div class="big gold">Zeit um!</div><div class="sub">${lead.slot === slot ? "Du liegst vorne!" : esc(f.names[lead.slot]) + " liegt vorne"}</div>` +
+          (rec.fin == null ? `<div class="sub">Geschafft: ${P.pctHtml(rec.best)} der Strecke</div>` : "");
       }
       else if (fnow < 0) {
         const c = Math.ceil(-fnow / 60);

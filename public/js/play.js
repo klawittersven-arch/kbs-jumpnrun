@@ -13,6 +13,11 @@
     return m + ":" + String(s).padStart(2, "0") + "." + String(r).padStart(3, "0");
   }
 
+  // geschaffte Strecke als ganze Prozent (abgerundet, damit nur das Ziel 100 % ist)
+  function pct(x) { return x == null || !(x >= 0) ? "–" : Math.floor(x * 100) + "\u00a0%"; }
+  // dasselbe für die Anzeige: das %-Zeichen der Pixelschrift ist schlecht lesbar, es kommt aus der Textschrift
+  function pctHtml(x) { return x == null || !(x >= 0) ? "–" : Math.floor(x * 100) + '<span class="pc">%</span>'; }
+
   // Wo steht ein Spieler im Rennen, als Anteil 0 … 1 (für die Fortschrittsleiste)
   function share(m, rec) {
     const n = m.plan.length;
@@ -47,8 +52,10 @@
   }
 
   // ---------------------------------------------------------------- Lokales Rennen (ein Spieler)
-  // opts: { stages, plan, view, color, onTick(m, rec), onFinish(result), onEvent(e) }
+  // opts: { stages, plan, view, color, limit, onTick(m, rec), onFinish(result), onTimeUp(result), onEvent(e) }
   // Ablauf: Countdown (3 Sekunden) → Rennen → Fahne der letzten Etappe → Weg zur Hütte → fertig
+  //   limit: Spielzeit in Frames (Qualifying). Wer dann nicht im Ziel ist, bekommt „Zeit um“ und als Ergebnis die
+  //   weiteste Strecke, die er geschafft hat (rec.best: 0 … 1 über alle Runden, siehe E.reachOf).
   function localRace(opts) {
     const m = E.createMatch(opts.stages, opts.plan, 1, {});
     const rec = m.recs[0];
@@ -61,6 +68,7 @@
         if (--R.count <= 0) { R.phase = "run"; A.SFX.start(); }
         return;
       }
+      if (R.phase === "timeup") return; // nach Ablauf der Zeit bleibt das Bild stehen
       const ev = E.stepMatch(m, [R.phase === "run" ? I.sample() : 0]);
       const w = E.worldFor(m, rec);
       for (const e of ev) {
@@ -69,6 +77,12 @@
         if (opts.onEvent) opts.onEvent(e);
       }
       if (ev.some((e) => e.t === "flag") && rec.fin == null && rec.k < m.plan.length - 1) A.SFX.split();
+      if (rec.fin == null && R.phase === "run" && opts.limit && m.frame >= opts.limit) {
+        R.phase = "timeup";
+        R.result = { timeUp: true, frames: m.frame, progress: rec.best, splits: rec.splits.slice(), deaths: rec.deaths };
+        A.SFX.timeUp();
+        if (opts.onTimeUp) opts.onTimeUp(R.result);
+      }
       if (rec.fin != null && R.phase === "run") {
         R.phase = "finish";
         R.result = { frames: rec.fin, splits: rec.splits.slice(), deaths: rec.deaths, coins: rec.p ? rec.p.coins : 0 };
@@ -118,7 +132,7 @@
     // eigene Eingaben bis zum aktuellen Frame eintragen; ruckelt das Handy, gelten die gehaltenen Tasten
     // für alle verpassten Frames (ein neuer Sprung zählt nur einmal)
     N.pump = () => {
-      // nach 5 Minuten bleibt das Rennen stehen (siehe E.FINAL_FRAMES)
+      // nach Ablauf der Zeit bleibt das Rennen stehen (siehe E.FINAL_FRAMES)
       const target = Math.min(N.frameNow(), E.FINAL_FRAMES);
       if (opts.local >= 0) {
         if (target <= 0) { I.sample(); return; }
@@ -127,7 +141,8 @@
           const bits = I.sample();
           for (let f = have; f < target; f++) S.pushLocal(f === have ? bits : bits & ~E.BIT.press);
         }
-        N.flush(false);
+        // am Ende der Zeit auch den letzten, kleinen Rest senden, sonst wartet der Server darauf
+        N.flush(target >= E.FINAL_FRAMES);
       } else {
         // der Beamer zeigt das Rennen knapp hinter der Echtzeit und schätzt höchstens 2,5 Sekunden voraus
         S.advanceTo(Math.max(S.match().frame, Math.min(N.frameNow() - BEAMER_DELAY, S.confirmed() + MAX_AHEAD, E.FINAL_FRAMES)));
@@ -224,21 +239,20 @@
   }
 
   // Zeitlimit im Finale: Sekunden bis zum Schluss, sobald der Countdown läuft (sonst 0); -1 heißt „Zeit um“
-  function finalCountdown(frame) {
-    if (frame >= E.FINAL_FRAMES) return -1;
-    if (frame >= E.FINAL_WARN) return Math.ceil((E.FINAL_FRAMES - frame) / 60);
+  // Countdown vor einem Zeitlimit: in den letzten Sekunden die verbleibenden Sekunden, danach -1, sonst 0
+  function limitCountdown(frame, end, warn) {
+    if (frame >= end) return -1;
+    if (frame >= warn) return Math.ceil((end - frame) / 60);
     return 0;
   }
-  // Rangfolge im Rennen: wer im Ziel ist nach Zeit, dann nach Fortschritt (wie auf dem Server)
+  function finalCountdown(frame) { return limitCountdown(frame, E.FINAL_FRAMES, E.FINAL_WARN); }
+  // Rangfolge im Rennen: wer im Ziel ist nach Zeit, dann wer dem Ziel am nächsten gekommen ist (wie auf dem Server)
   function standings(m) {
-    return m.recs.slice().sort((a, b) => {
-      if (a.fin != null || b.fin != null) return a.fin == null ? 1 : b.fin == null ? -1 : a.fin - b.fin || a.slot - b.slot;
-      return E.progressOf(m, b) - E.progressOf(m, a) || a.slot - b.slot;
-    });
+    return m.recs.slice().sort((a, b) => E.scoreOf(m, b) - E.scoreOf(m, a) || a.slot - b.slot);
   }
 
   // gerade das Speed-Item eingesammelt? Dann steht anderthalb Sekunden lang „Speed!“ groß im Bild
   const speedNews = (rec) => !!rec && !!rec.p && rec.p.speedT > E.SPEED_T - 90;
 
-  window.JRP = { fmt, share, drawRec, localRace, netRace, beamer, speedNews, finalCountdown, standings, FRAME_MS };
+  window.JRP = { fmt, pct, pctHtml, share, drawRec, localRace, netRace, beamer, speedNews, limitCountdown, finalCountdown, standings, FRAME_MS };
 })();

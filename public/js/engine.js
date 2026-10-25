@@ -45,8 +45,11 @@
   const RESPAWN_AFTER = 240; // spätestens so viele Frames nach einem verlorenen Leben beginnt die Etappe neu
   const REGROW = 240; // im Finale wachsen zerschlagene Ziegel nach 4 Sekunden nach
   const SPEED_T = 600; // so viele Frames rennt die Figur nach dem Speed-Item
-  // ein Finale dauert höchstens 5 Minuten; 10 Sekunden vor Schluss beginnt ein Countdown, dann gewinnt, wer vorne liegt
-  const FINAL_FRAMES = 5 * 60 * 60, FINAL_WARN = FINAL_FRAMES - 10 * 60;
+  // Zeitlimit wie im Qualifying: ein Finale dauert höchstens 2 Minuten; 10 Sekunden vor Schluss beginnt ein Countdown,
+  // dann gewinnt, wer dem Ziel am nächsten gekommen ist (siehe scoreOf)
+  const FINAL_FRAMES = 2 * 60 * 60, FINAL_WARN = FINAL_FRAMES - 10 * 60;
+  // Qualifying: jede und jeder hat 2 Minuten Spielzeit, die letzten 10 Sekunden zählt ein Countdown
+  const QUALI_FRAMES = 2 * 60 * 60, QUALI_WARN = QUALI_FRAMES - 10 * 60;
   const SLIME_AFTER = 120, SLIME_MAX = 0.5; // im Schleim und 2 Sekunden danach höchstens 0,5 px pro Frame
 
   // ---------------------------------------------------------------- Leveldaten
@@ -680,7 +683,7 @@
     const m = { frame: 0, stages, plan: plan.slice(), n, shared: !!opts.shared, regrow: !!opts.regrow, worlds: [], recs: [] };
     if (m.shared) plan.forEach((si, k) => m.worlds.push({ key: "k" + k, k, w: createWorld(stages[si], { shared: true, regrow: m.regrow }) }));
     for (let slot = 0; slot < n; slot++) {
-      const rec = { slot, k: 0, inter: 0, down: 0, fin: null, done: false, deaths: 0, splits: [], stageCoins: 0, carry: null, p: null, wk: null };
+      const rec = { slot, k: 0, inter: 0, down: 0, fin: null, done: false, deaths: 0, splits: [], stageCoins: 0, carry: null, p: null, wk: null, best: 0 };
       m.recs.push(rec);
       enterStage(m, rec, 0, {});
     }
@@ -767,6 +770,8 @@
         if (--rec.inter === 0) { enterStage(m, rec, rec.k, rec.carry || {}); rec.carry = null; }
       }
       if (rec.down && ++rec.down > RESPAWN_AFTER) respawn(m, rec);
+      const r = reachOf(m, rec);
+      if (r > rec.best) rec.best = r;
     }
     return out;
   }
@@ -778,11 +783,26 @@
     const recs = m.recs.map((r) => Object.assign({}, r, { splits: r.splits.slice(), carry: r.carry && Object.assign({}, r.carry), p: r.p ? bySlot[r.slot] : null }));
     return Object.assign({}, m, { plan: m.plan.slice(), worlds, recs });
   }
-  // Wo steht ein Spieler im Rennen? Größer heißt weiter vorne; im Ziel zählt die Zielzeit.
+  // Wo steht ein Spieler im Rennen? Größer heißt weiter vorne; im Ziel zählt die Zielzeit. (Für die Kamera am Beamer.)
   function progressOf(m, rec) {
     if (rec.fin != null) return 1e9 - rec.fin;
     const x = rec.p && rec.p.status !== "dead" && rec.p.status !== "dying" ? rec.p.x : 0;
     return rec.k * 100000 + x;
+  }
+  // Geschaffte Strecke gerade jetzt als Anteil 0 … 1 über alle Etappen (rechte Kante der Figur bis zur Fahne)
+  function reachOf(m, rec) {
+    if (rec.fin != null) return 1;
+    let x = 0;
+    if (rec.p && rec.p.status !== "dead" && rec.p.status !== "dying") {
+      const s = m.stages[m.plan[rec.k]];
+      x = Math.max(0, Math.min(1, (rec.p.x + rec.p.w) / ((s.flagCol + 1) * T)));
+    }
+    return Math.min(1, (rec.k + x) / m.plan.length);
+  }
+  // Wertung bei Zeitablauf (Qualifying und Finale): wer im Ziel ist, nach Zielzeit, sonst wer dem Ziel am nächsten
+  // gekommen ist, also die weiteste Strecke, die er bisher geschafft hat (rec.best). Größer ist besser.
+  function scoreOf(m, rec) {
+    return rec.fin != null ? 1e9 - rec.fin : Math.round(rec.best * 1e6);
   }
   function worldFor(m, rec) {
     const e = rec.wk && worldOf(m, rec.wk);
@@ -863,10 +883,10 @@
 
   return {
     T, VW, VH, ROWS, PH, SMALL_H, BIG_H, SOLID, TILE_CHARS, MIN_COLS, MAX_COLS, MAX_ENEMIES, MAX_LIFTS, NAME_MAX, MAX_STAGES,
-    LIFT_W, LIFT_H, LIFT_V, LIFT_LOOP, THEMES, ENEMY_KINDS, STAGE_PAUSE, RESPAWN_AFTER, REGROW, SPEED_T, SLIME_AFTER, SLIME_MAX, SPIKE_IN, FINAL_FRAMES, FINAL_WARN,
+    LIFT_W, LIFT_H, LIFT_V, LIFT_LOOP, THEMES, ENEMY_KINDS, STAGE_PAUSE, RESPAWN_AFTER, REGROW, SPEED_T, SLIME_AFTER, SLIME_MAX, SPIKE_IN, FINAL_FRAMES, FINAL_WARN, QUALI_FRAMES, QUALI_WARN,
     normalizeStage, normalizeLibrary, stageView, buildStages,
     makePlayer, createWorld, createSoloWorld, addPlayer, removePlayer, cloneWorld, tileAt, stepWorld,
     BIT, encodeInput, decodeInput, inputChar, charInput,
-    createMatch, stepMatch, cloneMatch, progressOf, worldFor, createSync,
+    createMatch, stepMatch, cloneMatch, progressOf, reachOf, scoreOf, worldFor, createSync,
   };
 });

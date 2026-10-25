@@ -10,7 +10,8 @@ import E from '../public/js/engine.js';
 export const MAX_PLAYERS = 60;
 export const MAX_ROUNDS = 5;
 export const MIN_FINAL = 2, MAX_FINAL = 4;
-const MAX_FINAL_FRAMES = E.FINAL_FRAMES; // nach 5 Minuten ist Schluss (siehe engine.js)
+const MAX_FINAL_FRAMES = E.FINAL_FRAMES; // nach 2 Minuten ist Schluss (siehe engine.js)
+const MAX_PROG = 0.999; // wer nicht im Ziel ist, steht immer hinter allen im Ziel
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{0,15}$/;
 
 export function cleanName(first, initial) {
@@ -203,12 +204,14 @@ export class RoomLogic {
       }
       case 'result': {
         const p = s.players[pid]; if (!p) return conn.send({ t: 'error', why: 'unknown' });
-        const total = Number(msg.frames);
-        if (!(total > 0 && total < 60 * 60 * 60)) return;
+        // im Ziel: die Zeit in Frames; nach 2 Minuten ohne Ziel (timeUp): die geschaffte Strecke als Anteil 0 … 1
+        const timeUp = msg.timeUp === true, total = Number(msg.frames), prog = Number(msg.progress);
+        if (timeUp ? !(prog >= 0 && prog <= 1) : !(total > 0 && total < 60 * 60 * 60)) return;
         // gilt nur für das Qualifying, in dem gespielt wurde
         if (!s.quali || int(msg.lv, 0, 1e9, -1) !== s.quali.lv) return conn.send({ t: 'result-old' });
-        if (p.total == null) {
-          p.total = Math.round(total);
+        if (p.status !== 'done') {
+          if (timeUp) p.prog = Math.min(MAX_PROG, Math.round(prog * 10000) / 10000);
+          else p.total = Math.round(total);
           p.splits = Array.isArray(msg.splits) ? msg.splits.slice(0, MAX_ROUNDS).map(x => Math.round(Number(x) || 0)) : null;
           p.deaths = int(msg.deaths, 0, 9999, 0);
           p.status = 'done';
@@ -273,12 +276,13 @@ export class RoomLogic {
       E.stepMatch(race.m, bits);
       race.m.recs.forEach((r, i) => { if (r.fin != null && f.fin[i] == null) { f.fin[i] = r.fin; changed = true; } });
     }
-    // nach 5 Minuten ist Schluss: wer dann vorne liegt, gewinnt
+    // nach 2 Minuten ist Schluss: wer dem Ziel dann am nächsten gekommen ist, gewinnt
     if (race.m.frame >= MAX_FINAL_FRAMES) changed = true;
     return changed;
   }
-  // Platzierung: wer im Ziel ist nach Zeit, dann nach Fortschritt. Das Finale endet, wenn höchstens einer
-  // noch läuft oder drei im Ziel sind, nach 5 Minuten (force) oder wenn die Lehrkraft es beendet.
+  // Platzierung: wer im Ziel ist nach Zeit, dann wer dem Ziel am nächsten gekommen ist (weiteste Strecke, E.scoreOf).
+  // Das Finale endet, wenn höchstens einer noch läuft oder drei im Ziel sind, nach 2 Minuten (force) oder wenn die
+  // Lehrkraft es beendet.
   conclude(s, force) {
     const f = s.final, n = f.p.length;
     const done = f.fin.filter(x => x != null).length;
@@ -287,9 +291,11 @@ export class RoomLogic {
     const order = f.p.map((_, i) => i).sort((a, b) => {
       const fa = f.fin[a], fb = f.fin[b];
       if (fa != null || fb != null) return fa == null ? 1 : fb == null ? -1 : fa - fb || a - b;
-      return m ? E.progressOf(m, m.recs[b]) - E.progressOf(m, m.recs[a]) || a - b : a - b;
+      return m ? E.scoreOf(m, m.recs[b]) - E.scoreOf(m, m.recs[a]) || a - b : a - b;
     });
     f.place = order;
+    // geschaffte Strecke (0 … 1) für die Anzeige bei allen, die nicht im Ziel sind
+    f.prog = m ? m.recs.map(r => Math.floor(r.best * 1000) / 1000) : null;
     f.timeUp = !!m && m.frame >= MAX_FINAL_FRAMES && f.fin.filter(x => x != null).length < Math.min(3, n - 1);
     f.state = 'done'; f.doneAt = this.io.now();
     s.phase = 'podium';
@@ -312,10 +318,16 @@ export class RoomLogic {
     for (const c of this.io.conns()) { const m = c.meta || {}; if (m.role === 'player' && c.ws !== this.closing) set.add(m.pid); }
     return set;
   }
+  // Platzierung im Qualifying: alle im Ziel nach Zeit, danach alle, deren 2 Minuten um waren, nach geschaffter Strecke
   ranking() {
     const s = this.s;
-    const done = s.order.filter(p => s.players[p] && s.players[p].total != null);
-    done.sort((a, b) => s.players[a].total - s.players[b].total || s.players[a].at - s.players[b].at);
+    const done = s.order.filter(p => s.players[p] && s.players[p].status === 'done');
+    done.sort((a, b) => {
+      const pa = s.players[a], pb = s.players[b], fa = pa.total != null, fb = pb.total != null;
+      if (fa !== fb) return fa ? -1 : 1;
+      if (fa) return pa.total - pb.total || pa.at - pb.at;
+      return (pb.prog || 0) - (pa.prog || 0) || pa.at - pb.at;
+    });
     return done;
   }
   quali() {
@@ -326,7 +338,7 @@ export class RoomLogic {
     const f = this.s.final; if (!f) return null;
     const out = {
       names: f.names, stageNames: f.stages.map(st => st.name), shared: f.shared, lv: f.lv, state: f.state,
-      startAt: f.startAt, fin: f.fin, place: f.place, round: f.round, doneAt: f.doneAt, si: f.si, timeUp: !!f.timeUp,
+      startAt: f.startAt, fin: f.fin, place: f.place, prog: f.prog || null, round: f.round, doneAt: f.doneAt, si: f.si, timeUp: !!f.timeUp,
     };
     if (withPids) { const on = this.online(); out.p = f.p; out.online = f.p.map(pid => on.has(pid)); }
     return out;
@@ -335,7 +347,7 @@ export class RoomLogic {
     const s = this.s, on = this.online(), rank = this.ranking();
     const players = s.order.filter(p => s.players[p]).map(pid => {
       const p = s.players[pid];
-      return { pid, name: p.name, status: p.status, total: p.total, splits: p.splits, deaths: p.deaths, online: on.has(pid), rank: rank.indexOf(pid) + 1 };
+      return { pid, name: p.name, status: p.status, total: p.total, prog: p.prog == null ? null : p.prog, splits: p.splits, deaths: p.deaths, online: on.has(pid), rank: rank.indexOf(pid) + 1 };
     });
     return { t: 'room', code: s.code, phase: s.phase, quali: this.quali(), players, final: this.finalInfo(true), now: this.io.now() };
   }
@@ -348,7 +360,7 @@ export class RoomLogic {
     }
     return {
       t: 'you', phase: s.phase, quali: this.quali(), now: this.io.now(),
-      me: p ? { name: p.name, status: p.status, total: p.total, rank: r + 1, of: rank.length } : null,
+      me: p ? { name: p.name, status: p.status, total: p.total, prog: p.prog == null ? null : p.prog, rank: r + 1, of: rank.length } : null,
       final, winner: f && s.phase === 'podium' && f.place.length ? f.names[f.place[0]] : null,
     };
   }

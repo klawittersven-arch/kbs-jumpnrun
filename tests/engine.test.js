@@ -296,5 +296,27 @@ console.log("\n== 8. Die Fahne lässt sich nicht überspringen, niemand fällt a
   ok(E.tileAt(w, st[0].cols, 5) === "#" && E.tileAt(w, -1, 5) === "#", "links und rechts vom Level steht eine Wand");
 }
 
+console.log("\n== 9. Zeitlimit: es zählt, wer dem Ziel am nächsten gekommen ist");
+{
+  ok(E.QUALI_FRAMES === 7200 && E.FINAL_FRAMES === 7200 && E.QUALI_WARN === 6600 && E.FINAL_WARN === 6600,
+    "Qualifying und Finale dauern höchstens 2 Minuten, Countdown ab 1:50");
+  // flaches Level: Platz 0 geht weit nach rechts und wieder zurück, Platz 1 geht weniger weit und bleibt stehen
+  const flat = { name: "Flach", theme: "meadow", cols: 40, rows: [...Array(13)].map(() => ".".repeat(40)).concat(["#".repeat(40), "#".repeat(40)]),
+    enemies: [], start: [2, 12], flag: [16, 12], hut: [22, 12] };
+  const fst = [E.stageView(E.normalizeStage(flat, 0))];
+  const m = E.createMatch(fst, [0], 2, {});
+  const a = E.inputChar(2).repeat(110) + E.inputChar(1).repeat(100), b = E.inputChar(2).repeat(70);
+  for (let f = 0; f < 400; f++) {
+    E.stepMatch(m, [E.charInput(a[f] || "0"), E.charInput(b[f] || "0")]);
+    if (f === 250) { const c = E.cloneMatch(m); ok(c.recs[0].best === m.recs[0].best, "die Kopie eines Rennens kennt die weiteste Strecke"); }
+  }
+  const [r0, r1] = m.recs;
+  ok(r1.p.x > r0.p.x && E.progressOf(m, r1) > E.progressOf(m, r0), "am Ende steht Platz 1 weiter rechts");
+  ok(r0.best > E.reachOf(m, r0) && r0.best > r1.best && E.scoreOf(m, r0) > E.scoreOf(m, r1), "gewertet wird die weiteste Strecke: Platz 0 liegt vorne", [r0.best, r1.best]);
+  const done = E.createMatch(fst, [0], 1, {});
+  for (let f = 0; f < 400 && done.recs[0].fin == null; f++) E.stepMatch(done, [E.charInput(E.inputChar(2))]);
+  ok(done.recs[0].fin != null && done.recs[0].best === 1 && E.scoreOf(done, done.recs[0]) > 1e6, "im Ziel: Strecke 1, Wertung vor allen ohne Ziel");
+}
+
 console.log(`\n${checks - fails} von ${checks} Prüfungen bestanden.`);
 process.exit(fails ? 1 : 0);

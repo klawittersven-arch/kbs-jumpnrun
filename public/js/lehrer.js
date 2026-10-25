@@ -131,7 +131,8 @@
   function renderSetup() {
     screen = "setup";
     viewEl.innerHTML = `<div class="tpage">
-      <div class="thead"><h2>Qualifying einrichten</h2><p>Die SuS spielen allein gegen die Uhr, jede und jeder auf dem eigenen Handy. Gegangen wird nur, Rennen gibt es im Klassenmodus nicht. Die Zeit erscheint hier am Beamer.</p></div>
+      <div class="thead"><h2>Qualifying einrichten</h2><p>Die SuS spielen allein gegen die Uhr, jede und jeder auf dem eigenen Handy. Gegangen wird nur, Rennen gibt es im Klassenmodus nicht. Die Zeit erscheint hier am Beamer.
+        Jede und jeder hat höchstens 2 Minuten Spielzeit, die letzten 10 Sekunden zählt ein Countdown. Wer dann nicht im Ziel ist, wird nach der geschafften Strecke eingeordnet, hinter allen im Ziel.</p></div>
       <div class="tsec"><h3>Level</h3><div id="slotLevels"></div></div>
       <div class="tsec"><h3>Rundenzahl</h3><div id="slotRounds"></div><p class="hint">Bei mehr als einer Runde muss das Level mehrmals hintereinander geschafft werden.</p></div>
       <div class="tactions">
@@ -170,7 +171,7 @@
     const q = room.quali;
     viewEl.innerHTML = `<div class="tpage quali">
       <div class="joinbox">
-        <p class="eyebrow">Qualifying · ${esc(q.name)} · ${roundsTxt(q.rounds)}</p>
+        <p class="eyebrow">Qualifying · ${esc(q.name)} · ${roundsTxt(q.rounds)} · höchstens 2 Minuten</p>
         <h2>Scanne den Code und lauf deine Bestzeit</h2>
         <canvas id="qr" class="qr" role="img" aria-label="QR-Code zum Mitspielen"></canvas>
         <p class="joinurl">Ohne Kamera: <b>${esc(location.host)}/mitspielen</b> öffnen und den Code <b class="code">${esc(room.code)}</b> eingeben.</p>
@@ -195,22 +196,25 @@
     $("#btnFinal").onclick = openFinalSetup;
     updateQuali();
   }
+  // Ergebnis im Qualifying: im Ziel (Zeit) oder nach 2 Minuten „Zeit um“ (geschaffte Strecke)
+  const hasResult = (p) => p.status === "done";
+  const resultTxt = (p) => (p.total != null ? P.fmt(p.total) : P.pct(p.prog));
   function ranked() {
-    const done = room.players.filter((p) => p.total != null).sort((a, b) => a.rank - b.rank);
-    return done.concat(room.players.filter((p) => p.total == null));
+    const done = room.players.filter(hasResult).sort((a, b) => a.rank - b.rank);
+    return done.concat(room.players.filter((p) => !hasResult(p)));
   }
   function updateQuali() {
-    const list = ranked(), done = list.filter((p) => p.total != null).length;
-    $("#counts").textContent = `${list.length} angemeldet · ${done} im Ziel`;
-    const fb = $("#btnFinal"); fb.disabled = done < 2; fb.title = done < 2 ? "Sobald zwei im Ziel sind, kann das Finale beginnen." : "";
+    const list = ranked(), done = list.filter(hasResult).length, inGoal = list.filter((p) => p.total != null).length;
+    $("#counts").textContent = `${list.length} angemeldet · ${inGoal} im Ziel` + (done > inGoal ? ` · ${done - inGoal} mit Zeit um` : "");
+    const fb = $("#btnFinal"); fb.disabled = done < 2; fb.title = done < 2 ? "Sobald zwei fertig sind (im Ziel oder nach 2 Minuten), kann das Finale beginnen." : "";
     const ol = $("#ranking");
     ol.classList.toggle("many", list.length > 12);
     if (!list.length) { ol.innerHTML = '<li class="empty">Noch niemand angemeldet. Sobald jemand den QR-Code scannt und einen Namen eingibt, erscheint er hier.</li>'; return; }
     ol.innerHTML = list.map((p, i) => {
-      const fin = p.total != null;
-      return `<li class="${fin && i < 4 ? "fin4" : ""}${fin ? "" : " running"}${p.online ? "" : " off"}" data-pid="${esc(p.pid)}">
+      const fin = hasResult(p), up = fin && p.total == null;
+      return `<li class="${fin && i < 4 ? "fin4" : ""}${fin ? "" : " running"}${up ? " timeup" : ""}${p.online ? "" : " off"}" data-pid="${esc(p.pid)}">
         <span class="rk">${fin ? i + 1 + "." : ""}</span>
-        <span class="nm">${esc(p.name)}</span><span class="tm">${fin ? P.fmt(p.total) : "läuft …"}</span>
+        <span class="nm">${esc(p.name)}</span><span class="tm"${up ? ` title="Zeit um: ${esc(resultTxt(p))} der Strecke geschafft"` : ""}>${up ? "<small>Zeit um</small> " + P.pctHtml(p.prog) : fin ? resultTxt(p) : "läuft …"}</span>
         <button class="kick" type="button" title="${esc(p.name)} entfernen" aria-label="${esc(p.name)} entfernen">×</button></li>`;
     }).join("");
     ol.querySelectorAll(".kick").forEach((b) => (b.onclick = () => {
@@ -220,7 +224,8 @@
   }
 
   // ---------- 3. Finale einrichten
-  function finishers() { return room.players.filter((p) => p.total != null).sort((a, b) => a.rank - b.rank); }
+  // alle mit Ergebnis in der Reihenfolge des Qualifyings; die Besten sind fürs Finale vorausgewählt
+  function finishers() { return room.players.filter(hasResult).sort((a, b) => a.rank - b.rank); }
   function sendFinal(start) {
     const si = fsel.si.slice(0, fsel.count);
     const msg = { t: start ? "final-start" : "final-setup", p: fsel.p, stages: si.map((i) => lib.stages[i]), si, shared: fsel.shared };
@@ -228,7 +233,7 @@
   }
   function openFinalSetup() {
     const fin = finishers();
-    if (fin.length < 2) return toast("Für das Finale braucht es mindestens zwei Zeiten.");
+    if (fin.length < 2) return toast("Für das Finale braucht es mindestens zwei Ergebnisse.");
     fsel.p = fin.slice(0, Math.min(fsel.n, fin.length)).map((p) => p.pid);
     if (fsel.si.length < 2 || fsel.si.some((i) => i >= lib.stages.length)) fsel.si = [0, Math.min(1, lib.stages.length - 1)];
     sendFinal(false);
@@ -239,7 +244,7 @@
     fsel.p = f.p.slice(); fsel.shared = f.shared;
     if (f.si && f.si.length && f.si.every((i) => i < lib.stages.length)) { fsel.si = f.si.concat(fsel.si.slice(f.si.length)); fsel.count = f.si.length; }
     viewEl.innerHTML = `<div class="tpage">
-      <div class="thead"><h2>Finale einrichten</h2><p>Die Schnellsten aus dem Qualifying sind vorausgewählt. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Die Reihenfolge im Qualifying bestimmt die Farbe. Nach 5 Minuten ist immer Schluss: 10 Sekunden vorher beginnt ein Countdown, dann gewinnt, wer vorne liegt.</p></div>
+      <div class="thead"><h2>Finale einrichten</h2><p>Die Besten aus dem Qualifying sind vorausgewählt: erst alle im Ziel nach Zeit, dann alle, deren 2 Minuten um waren, nach der geschafften Strecke. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Die Reihenfolge im Qualifying bestimmt die Farbe. Nach 2 Minuten ist immer Schluss: 10 Sekunden vorher beginnt ein Countdown, dann gewinnt, wer dem Ziel am nächsten gekommen ist.</p></div>
       <div class="tsec"><h3>Finalisten</h3><div class="finalists" id="fPlayers"></div></div>
       <div class="tsec"><h3>Anzahl Level</h3>
         <div class="seg-pick" role="radiogroup" aria-label="Anzahl Level" id="fCount">
@@ -291,7 +296,7 @@
       b.appendChild(figure(slot >= 0 ? slot : 0, false, "40px"));
       if (slot < 0) b.firstChild.style.opacity = ".35";
       const t = document.createElement("span");
-      t.innerHTML = `<span class="nm ${slot >= 0 ? "cname c" + slot : ""}">${p.rank}. ${esc(p.name)}</span><small>${P.fmt(p.total)}${slot >= 0 ? " · " + esc(G.COLORS[slot].name) : ""}</small>${slot >= 0 ? `<small class="online ${on ? "yes" : "no"}">${on ? "Handy verbunden" : "Handy nicht verbunden"}</small>` : ""}`;
+      t.innerHTML = `<span class="nm ${slot >= 0 ? "cname c" + slot : ""}">${p.rank}. ${esc(p.name)}</span><small>${p.total != null ? P.fmt(p.total) : "Zeit um · " + resultTxt(p)}${slot >= 0 ? " · " + esc(G.COLORS[slot].name) : ""}</small>${slot >= 0 ? `<small class="online ${on ? "yes" : "no"}">${on ? "Handy verbunden" : "Handy nicht verbunden"}</small>` : ""}`;
       b.appendChild(t);
       b.onclick = () => {
         let sel = fsel.p.slice();
@@ -400,13 +405,16 @@
           const stale = fnow > 60 && N.stale(i) && r.fin == null;
           $("#r" + i).classList.toggle("stale", stale);
           $("#rs" + i).textContent = stale ? "Verbindung …" : r.fin != null ? "im Ziel" : (ns > 1 ? "Etappe " + (r.k + 1) + "/" + ns : "unterwegs") + (r.deaths ? " · " + r.deaths + "× neu" : "");
-          $("#rt" + i).textContent = r.fin != null ? P.fmt(r.fin) : "";
+          // im Ziel die Zielzeit, sonst die weiteste geschaffte Strecke: danach wird bei Zeitablauf gewertet
+          const rt = $("#rt" + i);
+          rt.innerHTML = r.fin != null ? P.fmt(r.fin) : fnow > 0 ? P.pctHtml(r.best) : "";
+          rt.classList.toggle("prog", r.fin == null);
         });
       }
       // nach der Entscheidung noch kurz zuschauen, dann Siegerehrung
       if (race.done && net.serverNow() - race.done.doneAt > 4000) { stopRace(); renderPodium(); }
     }
-    $("#btnEnd").onclick = () => confirmToast("Finale jetzt beenden? Wer gerade vorne liegt, gewinnt.", "Beenden", () => send({ t: "final-end" }));
+    $("#btnEnd").onclick = () => confirmToast("Finale jetzt beenden? Wer dem Ziel bisher am nächsten gekommen ist, gewinnt.", "Beenden", () => send({ t: "final-end" }));
     $("#btnCancel").onclick = () => confirmToast("Finale abbrechen und zur Einrichtung zurück?", "Abbrechen", () => send({ t: "final-cancel" }));
     race.raf = requestAnimationFrame(loop);
   }
@@ -418,10 +426,10 @@
     const f = room.final; podiumRound = f.round;
     const pl = f.place;
     viewEl.innerHTML = `<div class="tpage podium">
-      <p class="eyebrow">Siegerehrung · Finale ${esc(f.stageNames.join(" + "))}${f.timeUp ? " · nach 5 Minuten entschieden" : ""}</p>
+      <p class="eyebrow">Siegerehrung · Finale ${esc(f.stageNames.join(" + "))}${f.timeUp ? " · nach 2 Minuten entschieden" : ""}</p>
       <canvas id="podCv" width="640" height="320" role="img" aria-label="Siegertreppchen"></canvas>
       <h2 class="cname c${pl[0]}">${esc(f.names[pl[0]])}</h2>
-      <div class="places">${pl.slice(0, 3).map((s, i) => `<span>${i + 1}. <b class="cname c${s}">${esc(f.names[s])}</b>${f.fin[s] != null ? " · " + P.fmt(f.fin[s]) : ""}</span>`).join("")}</div>
+      <div class="places">${pl.slice(0, 3).map((s, i) => `<span>${i + 1}. <b class="cname c${s}">${esc(f.names[s])}</b>${f.fin[s] != null ? " · " + P.fmt(f.fin[s]) : f.prog ? " · " + P.pctHtml(f.prog[s]) : ""}</span>`).join("")}</div>
       <div class="tactions center">
         <button class="big-btn" id="btnRematch" type="button">Revanche</button>
         <button class="ghost-btn" id="btnNewFinal" type="button">Anderes Finale</button>

@@ -80,6 +80,28 @@ ok(r.players.find((p) => p.name === 'Zoë M.').total === 2000, 'nur die erste Ze
 ok(last(phones[3], 'result-old') && r.players[3].total === null, 'eine Zeit aus einem alten Qualifying wird nicht gezählt');
 ok(last(phones[1], 'you').me.rank === 1 && last(phones[0], 'you').me.rank === 2, 'Plätze im Qualifying stimmen');
 
+console.log('\n== Zeit um im Qualifying');
+// nach 2 Minuten schickt das Handy statt einer Zeit die geschaffte Strecke (0 … 1)
+await say(phones[3], { t: 'result', timeUp: true, progress: 0.62, deaths: 1, lv: qlv });
+const ida = conn(); ida.pid = 'p9xxxxxxxx';
+await room.open(ida, { code: 'ABCDE', role: 'player', pid: ida.pid });
+await say(ida, { t: 'join', first: 'Ida', initial: 'S' });
+await say(ida, { t: 'result', timeUp: true, progress: 0.8, lv: qlv });
+await say(ida, { t: 'result', frames: 900, lv: qlv });
+const rq = last(teacher, 'room').players, byName = (n) => rq.find((p) => p.name === n);
+ok(byName('Lena K. 2').status === 'done' && byName('Lena K. 2').total === null && byName('Lena K. 2').prog === 0.62, 'nach Ablauf der Zeit zählt die geschaffte Strecke');
+ok(byName('Ida S.').prog === 0.8 && byName('Ida S.').total === null, 'auch hier zählt nur das erste Ergebnis');
+ok(['Mehmet Ö.', 'Lena K.', 'Zoë M.', 'Ida S.', 'Lena K. 2'].every((n, i) => byName(n).rank === i + 1), 'erst alle im Ziel nach Zeit, dann nach Strecke', rq.map((p) => p.name + ' ' + p.rank));
+ok(last(ida, 'you').me.rank === 4 && last(ida, 'you').me.prog === 0.8 && last(ida, 'you').me.of === 5, 'das Handy kennt Strecke und Platz');
+await say(ida, { t: 'result', timeUp: true, progress: 7, lv: qlv });
+const kim = conn(); kim.pid = 'p8xxxxxxxx';
+await room.open(kim, { code: 'ABCDE', role: 'player', pid: kim.pid });
+await say(kim, { t: 'join', first: 'Kim', initial: 'T' });
+await say(kim, { t: 'result', timeUp: true, progress: 2, lv: qlv });
+await say(kim, { t: 'result', timeUp: true, progress: 1, lv: qlv });
+ok(last(teacher, 'room').players.find((p) => p.name === 'Kim T.').prog < 1 && last(kim, 'you').me.rank === 4, 'ohne Ziel bleibt man hinter allen im Ziel, Unsinn wird abgelehnt');
+await say(teacher, { t: 'kick', pid: kim.pid });
+
 console.log('\n== Finale');
 const order = [phones[1], phones[0], phones[2]]; // die drei Schnellsten
 await say(teacher, { t: 'final-setup', p: order.map((c) => c.pid), stages: [tiny('Eins'), tiny('Zwei')], si: [0, 1], shared: true });
@@ -129,29 +151,34 @@ console.log('\n== Finale mit nur einem Level und Zeitlimit');
 await say(teacher, { t: 'final-setup', p: order.slice(0, 2).map((c) => c.pid), stages: [tiny('Solo')], shared: false });
 ok(last(teacher, 'room').final.stageNames.join() === 'Solo', 'ein Finale mit nur einem Level lässt sich einrichten');
 await say(teacher, { t: 'final-start' });
-// niemand erreicht die Fahne: Platz 0 bleibt stehen, Platz 1 geht ein Stück und bleibt dann stehen
-const still = E.inputChar(0).repeat(E.FINAL_FRAMES + 600);
-const walker = (E.inputChar(2).repeat(50) + E.inputChar(0).repeat(E.FINAL_FRAMES + 600)).slice(0, E.FINAL_FRAMES + 600);
+// niemand erreicht die Fahne: Platz 0 geht weit nach rechts und dann wieder ein Stück zurück,
+// Platz 1 geht weniger weit und bleibt dort stehen. Am Ende steht Platz 1 weiter rechts, Platz 0 war aber näher am Ziel.
+const fill = (s) => (s + E.inputChar(0).repeat(E.FINAL_FRAMES + 600)).slice(0, E.FINAL_FRAMES + 600);
+const back = fill(E.inputChar(2).repeat(110) + E.inputChar(1).repeat(100));
+const walker = fill(E.inputChar(2).repeat(70));
 let endedEarly = null;
 for (let f = 0; f < E.FINAL_FRAMES + 600 && room.s.phase === 'final'; f += 600) {
-  await say(order[0], { t: 'in', f, d: still.slice(f, f + 600) });
+  await say(order[0], { t: 'in', f, d: back.slice(f, f + 600) });
   await say(order[1], { t: 'in', f, d: walker.slice(f, f + 600) });
   if (f + 600 < E.FINAL_FRAMES && room.s.phase !== 'final' && endedEarly == null) endedEarly = f;
 }
 const tl = last(teacher, 'room');
-ok(endedEarly == null, 'vor Ablauf der 5 Minuten läuft das Finale weiter', endedEarly);
-ok(tl.phase === 'podium' && tl.final.timeUp && tl.final.place.join() === '1,0', 'nach 5 Minuten gewinnt, wer vorne liegt', tl.final);
+ok(E.FINAL_FRAMES === 2 * 60 * 60 && endedEarly == null, 'vor Ablauf der 2 Minuten läuft das Finale weiter', endedEarly);
+const rm = room.race.m;
+ok(rm.recs[1].p.x > rm.recs[0].p.x, 'am Ende steht Platz 1 weiter rechts');
+ok(tl.phase === 'podium' && tl.final.timeUp && tl.final.place.join() === '0,1', 'nach 2 Minuten gewinnt, wer dem Ziel am nächsten gekommen ist', tl.final);
+ok(tl.final.prog[0] > tl.final.prog[1] && tl.final.prog[0] < 1, 'die geschaffte Strecke steht im Ergebnis', tl.final.prog);
 await say(teacher, { t: 'logs?' });
-ok(last(teacher, 'logs').logs[0].length <= E.FINAL_FRAMES, 'nach 5 Minuten nimmt der Raum keine Eingaben mehr an');
+ok(last(teacher, 'logs').logs[0].length <= E.FINAL_FRAMES, 'nach 2 Minuten nimmt der Raum keine Eingaben mehr an');
 
 console.log('\n== Finale beenden und Sitzung löschen');
 await say(teacher, { t: 'final-setup', p: order.slice(0, 2).map((c) => c.pid), stages: [tiny('Eins'), tiny('Zwei')], shared: false });
 await say(teacher, { t: 'final-start' });
 for (let f = 0; f < 120; f += 6) { await say(order[0], { t: 'in', f, d: E.inputChar(0).repeat(6) }); await say(order[1], { t: 'in', f, d: E.inputChar(2).repeat(6) }); }
 await say(teacher, { t: 'final-end' });
-ok(last(teacher, 'room').phase === 'podium' && last(teacher, 'room').final.place.join() === '1,0', 'beim Abbruch gewinnt, wer weiter vorne ist');
+ok(last(teacher, 'room').phase === 'podium' && last(teacher, 'room').final.place.join() === '1,0', 'beim Abbruch gewinnt, wer dem Ziel näher gekommen ist');
 await say(teacher, { t: 'kick', pid: phones[3].pid });
-ok(last(phones[3], 'kicked') && last(teacher, 'room').players.length === 3, 'die Lehrkraft entfernt einen Namen');
+ok(last(phones[3], 'kicked') && last(teacher, 'room').players.length === 4, 'die Lehrkraft entfernt einen Namen');
 await say(teacher, { t: 'wipe' });
 ok(saved === null && phones[0].closed === 'ended', 'Sitzung beendet, Daten gelöscht, Handys getrennt');
 
