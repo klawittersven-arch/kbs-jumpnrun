@@ -230,6 +230,32 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     ok(ph2.every((x) => x === fin2.fin[winner2]), "auch das neu geladene Handy kommt auf dieselbe Zielzeit", ph2);
     await until(() => teacher.evaluate(() => window.__teacher.screen === "podium"), 9000, "zweite Siegerehrung");
 
+    console.log("\n== Üben auf der Startseite: einfach oder schwer");
+    const sctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+    const solo = await sctx.newPage();
+    watch(solo, "Startseite");
+    await solo.goto(BASE + "/");
+    await solo.waitForSelector("#levels .lvl");
+    ok(await solo.evaluate(() => window.__solo.easy) && await solo.locator('#diff button[data-easy="1"][aria-checked="true"]').count() === 1, "„Einfach“ ist vorausgewählt");
+    const enemiesInRun = async () => {
+      await solo.locator("#levels .lvl").first().click();
+      await until(() => solo.evaluate(() => window.__solo.race && window.__solo.race.m), 4000, "Übungslauf");
+      const n = await solo.evaluate(() => window.__solo.race.m.worlds.reduce((a, e) => a + e.w.enemies.length, 0));
+      const slime = await solo.evaluate(() => window.__solo.race.m.worlds.some((e) => e.w.s.grid.some((r) => [...r].some((ch) => ch === "x" || ch === "*"))));
+      await solo.click("#btnBack");
+      return { n, slime };
+    };
+    const runEasy = await enemiesInRun();
+    ok(runEasy.n === 0 && !runEasy.slime, "einfach: keine Gegner, Stachelkugeln und kein Schleim", runEasy);
+    await solo.click('#diff button[data-easy="0"]');
+    const runHard = await enemiesInRun();
+    ok(runHard.n > 0 && runHard.slime, "schwer: das Level, wie es gebaut ist", runHard);
+    await solo.reload();
+    await solo.waitForSelector("#levels .lvl");
+    ok(await solo.evaluate(() => window.__solo.easy) === false, "der Browser merkt sich die Wahl");
+    await shot(solo, "15-startseite-ueben");
+    await sctx.close();
+
     console.log("\n== Level-Editor nur für die Lehrkraft");
     await teacher.click("#btnEditor");
     await teacher.waitForSelector("#edCanvas");

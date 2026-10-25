@@ -31,6 +31,13 @@
     <div class="card" style="margin-top:14px">
       <h2>Üben</h2>
       <p>Lauf ein Level allein gegen die Uhr, so wie im Qualifying. Deine Bestzeit bleibt in diesem Browser.</p>
+      <div class="diffrow">
+        <div class="seg-pick" role="radiogroup" aria-label="Schwierigkeit" id="diff">
+          <button type="button" role="radio" data-easy="1" aria-checked="true">Einfach</button>
+          <button type="button" role="radio" data-easy="0" aria-checked="false">Schwer</button>
+        </div>
+        <span class="hint" id="diffHint"></span>
+      </div>
       <div class="levels" id="levels"></div>
     </div>
   </section>

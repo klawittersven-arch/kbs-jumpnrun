@@ -4,11 +4,11 @@
 .ed-title{font-family:var(--f-display);font-weight:400;font-size:1.5em}
 .ed-actions{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
 .ed-actions kbd{font:700 .7em/1 var(--f-pixel);border:1px solid currentColor;border-radius:3px;padding:2px 4px;margin-left:4px;opacity:.75}
-.ed-stages,.seg-pick{display:inline-flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:10px;background:var(--bezel);box-shadow:0 0 0 1px var(--line)}
+.ed-stages{display:inline-flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:10px;background:var(--bezel);box-shadow:0 0 0 1px var(--line)}
 .ed-stages{display:flex}
-.ed-stages button,.seg-pick button{appearance:none;border:0;border-radius:7px;min-height:34px;padding:0 12px;background:transparent;color:var(--muted);font:500 .95em/1 var(--f-body);white-space:nowrap;cursor:pointer}
-.ed-stages button:hover,.seg-pick button:hover{color:var(--text)}
-.ed-stages button[aria-checked="true"],.seg-pick button[aria-checked="true"]{background:var(--card-2);color:var(--led)}
+.ed-stages button{appearance:none;border:0;border-radius:7px;min-height:34px;padding:0 12px;background:transparent;color:var(--muted);font:500 .95em/1 var(--f-body);white-space:nowrap;cursor:pointer}
+.ed-stages button:hover{color:var(--text)}
+.ed-stages button[aria-checked="true"]{background:var(--card-2);color:var(--led)}
 .ed-tools{display:flex;flex-wrap:wrap;gap:4px;padding:6px;border-radius:10px;background:var(--bezel);box-shadow:0 0 0 1px #000}
 .tool{appearance:none;display:grid;justify-items:center;align-content:start;gap:4px;width:66px;padding:6px 2px 5px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:500 .75em/1.15 var(--f-body);text-align:center;cursor:pointer}
 .tool canvas{width:32px;height:32px}

@@ -4,7 +4,12 @@
   const E = window.JRE, G = window.JRG, A = window.JRA, I = window.JRI, P = window.JRP, U = window.KUtil;
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const lib = E.normalizeLibrary(window.JR_LEVELS), stages = E.buildStages(lib);
+  const lib = E.normalizeLibrary(window.JR_LEVELS);
+  // Schwierigkeit wie im Klassenmodus (Standard: einfach): „einfach“ ohne Gegner, Stachelkugeln und Schleim,
+  // „schwer“ sind die Level, wie sie gebaut sind. Der Browser merkt sich die Wahl.
+  const hard = E.buildStages(lib), easy = E.buildStages(Object.assign({}, lib, { stages: lib.stages.map(E.easyStage) }));
+  let isEasy = U.store("jr.solo.easy") !== false;
+  const stagesNow = () => (isEasy ? easy : hard);
   const home = $("#home"), game = $("#game"), msg = $("#msg");
   if (matchMedia("(hover: none) and (pointer: coarse)").matches) document.body.classList.add("touch");
   I.walkOnly = true;
@@ -25,10 +30,19 @@
     location.href = "mitspielen#" + v;
   };
 
-  // Bestzeit je Level, an den Inhalt des Levels gebunden
-  const key = (i) => "jr.best." + lib.stages[i].name + "." + JSON.stringify(lib.stages[i]).length;
+  // Bestzeit je Level und Schwierigkeit, an den Inhalt des Levels gebunden (ohne Zusatz: schwer, wie bisher)
+  const key = (i) => "jr.best." + lib.stages[i].name + "." + JSON.stringify(lib.stages[i]).length + (isEasy ? ".einfach" : "");
+  function renderDiff() {
+    $("#diff").querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String((b.dataset.easy === "1") === isEasy)));
+    $("#diffHint").textContent = isEasy ? "Ohne Gegner, Stachelkugeln und Schleim." : "Die Level, wie sie gebaut sind: mit Gegnern, Stachelkugeln und Schleim.";
+  }
+  $("#diff").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+    isEasy = b.dataset.easy === "1";
+    U.store("jr.solo.easy", isEasy);
+    renderDiff(); renderLevels();
+  }));
   function renderLevels() {
-    const box = $("#levels");
+    const box = $("#levels"), stages = stagesNow();
     box.innerHTML = "";
     lib.stages.forEach((s, i) => {
       const b = document.createElement("button");
@@ -55,7 +69,7 @@
     if (document.body.classList.contains("touch")) game.scrollIntoView({ block: "start" });
     let done = null;
     race = P.localRace({
-      stages, plan: [i], view, color: 0,
+      stages: stagesNow(), plan: [i], view, color: 0,
       onFinish: (r) => {
         const best = U.store(key(i));
         done = { frames: r.frames, best, pb: !best || r.frames < best };
@@ -63,7 +77,7 @@
       },
       onTick: (m, rec, st) => {
         $("#hTime").textContent = P.fmt(st.phase === "count" ? 0 : done ? done.frames : m.frame);
-        $("#hInfo").innerHTML = `Üben<br><b>${esc(lib.stages[i].name)}</b>`;
+        $("#hInfo").innerHTML = `Üben · ${isEasy ? "einfach" : "schwer"}<br><b>${esc(lib.stages[i].name)}</b>`;
         if (st.phase === "count") msg.innerHTML = `<div class="big">${Math.ceil(st.count / 60)}</div>`;
         else if (m.frame < 40) msg.innerHTML = `<div class="big">Los!</div>`;
         else if (done) msg.innerHTML = `<div class="big gold">${done.pb ? "Bestzeit!" : "Ziel!"}</div><div class="sub">${P.fmt(done.frames)}${!done.pb ? " · Bestzeit " + P.fmt(done.best) : ""}</div>`;
@@ -86,5 +100,8 @@
     if (e.code === "KeyR" && !e.repeat) { e.preventDefault(); play(si); }
     else if (e.code === "Escape") { e.preventDefault(); back(); }
   });
+  renderDiff();
   renderLevels();
+
+  window.__solo = { get race() { return race; }, get easy() { return isEasy; } };
 })();

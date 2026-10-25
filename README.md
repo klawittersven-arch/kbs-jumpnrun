@@ -4,7 +4,7 @@ Das Jump’n’Run der Karoline-Breitinger-Schule mit Klassenmodus. Es läuft im
 
 | Seite | Adresse | Für wen |
 |---|---|---|
-| Startseite | `/` | alle: mit Code mitspielen oder allein üben |
+| Startseite | `/` | alle: mit Code mitspielen oder allein üben (einfach oder schwer, Standard: einfach) |
 | Klassenmodus | `/lehrer` | Lehrkraft am Laptop mit Beamer, mit Level-Editor |
 | Mitspielen | `/mitspielen` | SuS, wird über den QR-Code geöffnet |
 

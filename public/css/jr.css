@@ -147,6 +147,13 @@ body.teacher{font-size:17px}
 .check input{width:20px;height:20px;accent-color:var(--led)}
 
 /* Levelwahl */
+/* Umschalter mit zwei bis drei Möglichkeiten (Schwierigkeit, Anzahl Level) */
+.seg-pick{display:inline-flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:10px;background:var(--bezel);box-shadow:0 0 0 1px var(--line)}
+.seg-pick button{appearance:none;border:0;border-radius:7px;min-height:34px;padding:0 12px;background:transparent;color:var(--muted);font:500 .95em/1 var(--f-body);white-space:nowrap;cursor:pointer}
+.seg-pick button:hover{color:var(--text)}
+.seg-pick button[aria-checked="true"]{background:var(--card-2);color:var(--led)}
+.diffrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px}
+.diffrow .hint{margin:0}
 .levels{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .lvl{display:grid;gap:8px;text-align:left;padding:10px;border-radius:12px;border:3px solid transparent;background:var(--card);color:var(--text);cursor:pointer;font:inherit}
 .lvl:hover{border-color:var(--line)}
