@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1a1d25">
+<title>Mitspielen · KBS Jump-’n’-Run!</title>
+<link rel="icon" href="img/logo.png">
+<link rel="stylesheet" href="css/jr.css">
+</head>
+<body class="student">
+<main class="app">
+  <header class="top">
+    <h1 class="brand">KBS Jump-’n’-Run!</h1>
+    <div class="tools">
+      <span class="netdot" id="netdot" data-s="offline" title="Verbindung"></span>
+      <button class="chip" id="btnSound" type="button" aria-pressed="true">Ton: an</button>
+    </div>
+  </header>
+
+  <section id="panel" aria-live="polite">
+    <div class="card"><h2>Verbinde …</h2><p>Einen Moment, die Klasse wird gesucht.</p></div>
+  </section>
+
+  <section class="game" id="game" hidden aria-label="Spiel">
+    <div class="hudbar">
+      <span class="hud-time" id="hTime">0:00.000</span>
+      <span class="hud-info" id="hInfo"></span>
+    </div>
+    <div class="screen">
+      <canvas id="screen" width="256" height="240" aria-label="Spielbild"></canvas>
+      <div class="overlay" id="msg" aria-live="polite"></div>
+    </div>
+    <div class="pad" id="pad">
+      <div class="dpad" id="dpad" aria-hidden="true">
+        <span class="arm-up" data-btn="up"></span>
+        <span class="arm-left" data-btn="left"></span>
+        <span class="hub"></span>
+        <span class="arm-right" data-btn="right"></span>
+        <span class="arm-down" data-btn="down"></span>
+      </div>
+      <div class="actions" aria-hidden="true">
+        <span class="act" id="tJump" data-btn="a">Springen</span>
+      </div>
+    </div>
+    <p class="keys"><span><kbd>←</kbd> <kbd>→</kbd> gehen</span><span><kbd>Leertaste</kbd> springen, länger halten springt höher</span></p>
+  </section>
+</main>
+<script src="js/engine.js"></script>
+<script src="js/gfx.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/play.js"></script>
+<script src="js/net.js"></script>
+<script src="js/mitspielen.js"></script>
+</body>
+</html>

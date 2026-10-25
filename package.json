@@ -1,0 +1,12 @@
+{
+  "name": "kbs-jumpnrun",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KBS Jump-'n'-Run! – Jump'n'Run der Karoline-Breitinger-Schule mit Klassenmodus",
+  "scripts": {
+    "start": "node server/local.mjs",
+    "test": "node tests/engine.test.js && node tests/room.test.mjs",
+    "levels": "node tools/bot.js --walk",
+    "deploy": "npx wrangler deploy"
+  }
+}
