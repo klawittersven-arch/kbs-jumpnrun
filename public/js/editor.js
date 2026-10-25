@@ -10,7 +10,7 @@
   const TOOLS = [
     { id: "#", label: "Erde" }, { id: "R", label: "Fels" }, { id: "B", label: "Ziegel" },
     // weiche Trennstriche: lange Namen brechen in den schmalen Knöpfen um
-    { id: "b", label: "Münz­ziegel" }, { id: "Q", label: "Münz­block" }, { id: "P", label: "Kristall­block" },
+    { id: "b", label: "Münz­ziegel" }, { id: "Q", label: "Münz­block" }, { id: "P", label: "Kristall­block" }, { id: "S", label: "Speed­block" },
     { id: "o", label: "Münze", sep: true }, { id: "s", label: "Speed-Item" }, { id: "x", label: "Schleim" }, { id: "*", label: "Stachel\u00adkugel" }, { id: "~", label: "Wasser" },
     { id: "walker", label: "Käfer", sep: true }, { id: "snail", label: "Schnecke" },
     { id: "liftUp", label: "Lift hoch", sep: true }, { id: "liftDown", label: "Lift runter" },
@@ -101,6 +101,7 @@
             <li>Die Fahnenstange reicht bis auf das angeklickte Feld. Danach geht die Figur allein zur Hütte.</li>
             <li>Eine Lücke im Boden ist ein Abgrund. Wasser ist nur Deko, wer hineinfällt, stürzt ab.</li>
             <li>Das <b>Speed-Item</b> lässt die Figur 10 Sekunden lang rennen: schneller und mit höheren Sprüngen. Setz es an Stellen, die schwer zu erreichen sind.</li>
+            <li>Aus dem <b>Speedblock</b> kommt ein Speed-Item, wenn man von unten dagegen springt (wie beim Kristallblock). Es gleitet nach rechts und fällt über Kanten.</li>
             <li>Eine <b>Stachelkugel</b> trifft wie ein Gegner, auch wer von oben darauf springt. Gegner drehen an ihr um. Setz sie so, dass man sie überspringen oder umgehen kann.</li>
             <li><b>Schleim</b> setzt du in das Feld direkt über dem Boden. Wer hineintritt, wird sehr langsam, auch noch 2 Sekunden danach. Gut ist Schleim, den man überspringen oder auf einem anderen Weg umgehen kann.</li>
             <li><b>Lifts</b> fahren endlos hoch oder runter. Ein Klick mit dem anderen Lift-Werkzeug dreht die Richtung um.</li>
@@ -148,9 +149,9 @@
 
   // ---------------------------------------------------------------- Zeichnen
   function badge(g, t, X, Y) {
-    if (t !== "b" && t !== "Q" && t !== "P") return;
+    if (t !== "b" && t !== "Q" && t !== "P" && t !== "S") return;
     g.fillStyle = "#1a1d25"; g.fillRect(X + 9, Y + 9, 6, 6);
-    g.fillStyle = t === "P" ? "#bff0ff" : "#f0b43c"; g.fillRect(X + 10, Y + 10, 4, 4);
+    g.fillStyle = t === "P" ? "#bff0ff" : t === "S" ? "#fff6c4" : "#f0b43c"; g.fillRect(X + 10, Y + 10, 4, 4);
   }
   function icon(id, theme) {
     const c = document.createElement("canvas");

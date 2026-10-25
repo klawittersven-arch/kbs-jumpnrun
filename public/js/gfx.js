@@ -733,6 +733,26 @@
     if ((tick >> 3) % 3 === 0) { g.fillStyle = "#ffffff"; g.fillRect(X + 13, Y + 2 + bob, 1, 1); g.fillRect(X + 1, Y + 11 + bob, 1, 1); }
   }
 
+  // Speed-Block: goldener Block mit Blitz; zwei Bilder (der Blitz leuchtet kurz auf), wie beim Kristallblock
+  const SPEED_BLOCK = [0, 1].map((f) => {
+    const c = canvas(16, 16), x = c.getContext("2d");
+    const px = (X, Y, col) => { x.fillStyle = col; x.fillRect(X, Y, 1, 1); };
+    x.fillStyle = "#4a2a00"; x.fillRect(0, 0, 16, 16);
+    x.fillStyle = "#e39b1f"; x.fillRect(1, 1, 14, 14);
+    x.fillStyle = "#ffcf5a"; x.fillRect(1, 1, 14, 1); x.fillRect(1, 1, 1, 14);
+    x.fillStyle = "#b8710e"; x.fillRect(1, 14, 14, 1); x.fillRect(14, 1, 1, 14);
+    x.fillStyle = "#4a2a00"; x.fillRect(2, 2, 1, 1); x.fillRect(13, 2, 1, 1); x.fillRect(2, 13, 1, 1); x.fillRect(13, 13, 1, 1);
+    const bolt = ["....kkk", "...kYYk", "..kYYk.", ".kYYYkk", "kYYYYYk", "kkYYYk.", "..kYk..", ".kYk...", ".kk...."];
+    const Y = f ? "#ffffff" : "#fff3b0";
+    bolt.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === "k") px(5 + i, 3 + j, "#5a3200"); else if (ch === "Y") px(5 + i, 3 + j, Y); }));
+    return c;
+  });
+  // Gegenstand, der aus einem Block gekommen ist: Kristall oder Speed-Item
+  function drawItem(g, it, cam, tick) {
+    const X = Math.round(it.x - 1 - cam), Y = Math.round(it.y - 1);
+    if (it.kind === "speed") drawSpeedItem(g, X, Y, tick); else g.drawImage(CRYSTAL, X, Y);
+  }
+
   // Stachelkugel: eiserne Kugel mit acht spitzen Stacheln; zwei Bilder (gedreht). Auf hellen Themen dunkler Umriss,
   // auf dunklen Themen ein heller Rand, damit sie überall gut zu sehen ist
   function spikeBall(turn, dark) {
@@ -1071,7 +1091,7 @@
     x.fillRect(0, 0, s.cols, ROWS);
     for (let r = 0; r < ROWS; r++) for (let col = 0; col < s.cols; col++) {
       const t = s.grid[r][col];
-      const color = t === "#" ? th.miniGround : t === "R" ? th.miniRock : t === "B" || t === "b" ? th.miniBrick : t === "Q" || t === "P" ? "#4fb8dc" : t === "o" ? "#f0b43c" : t === "~" ? "#3f86c4" : t === "s" ? "#fff6c4" : t === "x" ? "#b04dff" : t === "*" ? "#ff5a5a" : null;
+      const color = t === "#" ? th.miniGround : t === "R" ? th.miniRock : t === "B" || t === "b" ? th.miniBrick : t === "Q" || t === "P" ? "#4fb8dc" : t === "o" ? "#f0b43c" : t === "~" ? "#3f86c4" : t === "s" ? "#fff6c4" : t === "x" ? "#b04dff" : t === "*" ? "#ff5a5a" : t === "S" ? "#ffd23f" : null;
       if (color) { x.fillStyle = color; x.fillRect(col, r, 1, 1); }
     }
     x.fillStyle = "#d9a55a";
@@ -1147,6 +1167,7 @@
     if (t === "s") return drawSpeedItem(g, X, Y, tick);
     if (t === "x") return drawSlime(g, X, Y, tick, c, true, true);
     if (t === "*") return g.drawImage(SPIKES[th.dark ? "dark" : "light"][(tick >> 4) & 1], X, Y);
+    if (t === "S") return g.drawImage(SPEED_BLOCK[(tick >> 4) % 3 === 0 ? 1 : 0], X, Y);
     if (t === "#") g.drawImage((SOLID.has(above) ? tiles.groundFill : tiles.groundTop)[(hash(c, r) * 4) | 0], X, Y);
     else if (t === "R") g.drawImage(tiles.rock, X, Y);
     else if (t === "B" || t === "b") g.drawImage(tiles.brick, X, Y);
@@ -1308,7 +1329,7 @@
     for (const [k, img] of bg.layers) drawRepeat(g, img, Math.round(cam * k + (k < 0.1 ? tick * 0.05 : 0)), vw);
     const hx = s.hutCol * T - cam;
     if (hx > -100 && hx < vw + 20) drawHut(g, hx, s.hutFloor * T, s.theme);
-    for (const it of w.items) if (!it.gone && it.rise > 0) g.drawImage(CRYSTAL, Math.round(it.x - 1 - cam), Math.round(it.y - 1));
+    for (const it of w.items) if (!it.gone && it.rise > 0) drawItem(g, it, cam, tick);
     const c0 = Math.floor(cam / T), c1 = c0 + Math.ceil(vw / T), slimes = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = c0; c <= c1; c++) {
@@ -1327,7 +1348,7 @@
     const fx = s.flagCol * T + 7 - cam, base = s.flagBaseRow * T;
     if (fx > -24 && fx < vw + 4) drawPole(g, fx, w.flagY, base, opts.won || w.flagDown, tick);
     for (const L of w.lifts) if (L.x + L.w > cam && L.x < cam + vw) drawLift(g, Math.round(L.x - cam), Math.round(L.y), L.w);
-    for (const it of w.items) if (!it.gone && it.rise <= 0) g.drawImage(CRYSTAL, Math.round(it.x - 1 - cam), Math.round(it.y - 1));
+    for (const it of w.items) if (!it.gone && it.rise <= 0) drawItem(g, it, cam, tick);
     const BUG = BUGS[s.theme] || BUGS.meadow, SNL = SNAILS[s.theme] || SNAILS.meadow;
     for (const e of w.enemies) {
       // noch nicht losgelaufene Gegner warten an ihrem Platz (im Breitbild am Beamer sind sie schon zu sehen)

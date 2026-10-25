@@ -28,12 +28,13 @@
     itemVx: 1, shellNap: 300, deadG: 0.25,
   };
   const SMALL_H = 22, BIG_H = 28;
-  const SOLID = new Set(["#", "R", "B", "b", "Q", "P", "U"]);
+  const SOLID = new Set(["#", "R", "B", "b", "Q", "P", "S", "U"]);
   // "U" (ein geleerter Block) entsteht erst beim Spielen; "~" ist Wasser, sieht aus wie ein Bach, trägt aber nicht;
   // "s" ist das Speed-Item: wer es einsammelt, rennt 10 Sekunden lang;
   // "x" ist Schleim, eine Pfütze auf dem Boden darunter: wer hineintritt, wird sehr langsam;
-  // "*" ist eine Stachelkugel: wer sie berührt, wird getroffen wie von einem Gegner (auch von oben)
-  const TILE_CHARS = ".#RBbQPo~sx*";
+  // "*" ist eine Stachelkugel: wer sie berührt, wird getroffen wie von einem Gegner (auch von oben);
+  // "S" ist ein Speed-Block: wie der Kristallblock, nur kommt ein Speed-Item heraus
+  const TILE_CHARS = ".#RBbQPo~sx*S";
   const SPIKE_IN = 3; // die Kugel ist rund: getroffen wird nur, wer ihr Inneres berührt (10 × 10 px)
   const MIN_COLS = 24, MAX_COLS = 400, MAX_ENEMIES = 160, MAX_LIFTS = 40, NAME_MAX = 24, MAX_STAGES = 12;
   // Lifte fahren ewig ihre Spalte hinauf oder hinunter: wer den Bildschirm verlässt, kommt auf der anderen Seite wieder
@@ -368,9 +369,12 @@
     if (t === "Q" || t === "b") {
       setTile(w, c, r, "U"); p.coins++; w.bumps.push({ c, r, t: 8 });
       ev.push({ t: "coin", s: p.slot, x, y, pop: true });
-    } else if (t === "P") {
+    } else if (t === "P" || t === "S") {
+      // heraus steigt ein Kristall (P) oder ein Speed-Item (S); danach gleitet es nach rechts
       setTile(w, c, r, "U"); w.bumps.push({ c, r, t: 8 });
-      w.items.push({ x: x + 1, y, w: 14, h: 14, vx: PH.itemVx, vy: 0, rise: 16, onGround: true, gone: false });
+      const item = { x: x + 1, y, w: 14, h: 14, vx: PH.itemVx, vy: 0, rise: 16, onGround: true, gone: false };
+      if (t === "S") item.kind = "speed";
+      w.items.push(item);
       ev.push({ t: "sprout", s: p.slot, x, y });
     } else if (t === "B") {
       if (p.big) {
@@ -492,6 +496,7 @@
     for (const it of w.items) {
       if (it.gone || it.rise > 0 || !overlap(p, it)) continue;
       it.gone = true;
+      if (it.kind === "speed") { p.speedT = SPEED_T; ev.push({ t: "speed", s: p.slot, x: it.x, y: it.y }); continue; }
       if (!p.big) { p.freeze = 40; p.freezeKind = "grow"; ev.push({ t: "grow", s: p.slot }); }
       else { p.coins += 5; ev.push({ t: "bonus", s: p.slot, x: it.x, y: it.y }); }
     }

@@ -190,6 +190,26 @@ console.log("\n== 5. Speed-Item");
   ok(m.recs[0].p.speedT > 0 && m.recs[1].p.speedT === 0, "im gemeinsamen Level gehört es dem, der zuerst da ist");
 }
 
+console.log("\n== 5b. Speed-Block");
+{
+  const row = (s) => s.padEnd(80, ".");
+  const rows = [];
+  for (let r = 0; r < 13; r++) rows.push(row(r === 9 ? "......S" : ""));
+  rows.push("#".repeat(80), "#".repeat(80));
+  const st = E.buildStages(E.normalizeLibrary({ stages: [{ name: "Block", theme: "meadow", cols: 80, rows, enemies: [], start: [2, 12], flag: [70, 12], hut: [74, 12] }] }));
+  // unter den Block laufen, hochspringen, dann stehen bleiben: das Item gleitet nach rechts zur Figur
+  const w = E.createSoloWorld(st, 0);
+  let sprout = -1, got = -1;
+  for (let f = 0; f < 500 && got < 0; f++) {
+    const under = w.p.x > 6 * 16 && w.p.x < 6 * 16 + 4 && w.p.onGround && sprout < 0;
+    const ev = E.stepWorld(w, [{ left: false, right: !under && sprout < 0, a: under || (!w.p.onGround && sprout < 0), aPressed: under }]);
+    if (ev.some((e) => e.t === "sprout")) sprout = f;
+    if (ev.some((e) => e.t === "speed")) got = f;
+  }
+  ok(sprout >= 0 && E.tileAt(w, 6, 9) === "U", "von unten angestoßen: der Block ist leer, ein Item kommt heraus");
+  ok(got > sprout && w.p.speedT > 0 && !w.p.big, "das Item ist ein Speed-Item (Speed statt Wachsen)", { sprout, got, speedT: w.p.speedT });
+}
+
 console.log("\n== 6. Schleim");
 {
   const row = (s) => s.padEnd(120, ".");
