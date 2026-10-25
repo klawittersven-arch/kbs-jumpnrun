@@ -626,6 +626,8 @@
     return set;
   }
   const NURSES = COLORS.map((c) => nurseSet(Object.assign({}, BASE_PAL, c.pal)));
+  // goldene Fassung für das Speed-Item: die Figur flackert zwischen ihrer Farbe und Gold
+  const NURSE_GOLD = nurseSet(Object.assign({}, BASE_PAL, { W: "#FFF6B8", w: "#FFD84A", g: "#F0A93C", K: "#FF7A3D", k: "#D9531F", H: "#C2662E", h: "#8A3A1C" }));
 
   // ---------------------------------------------------------------- Gegner
   const BEETLE = {
@@ -703,6 +705,65 @@
     }
     px(5, 3, "#ffffff"); px(4, 4, "#ffffff"); px(6, 3, "#ffffff");
   });
+
+  // Speed-Item: ein goldener Blitz
+  const BOLT = spriteFrom([
+    "......kkkkk.",
+    ".....kyYYYk.",
+    "....kyYYYk..",
+    "...kyYYYk...",
+    "..kyYYYk....",
+    ".kyYYYYkkkk.",
+    "kyYYYYYYYYYk",
+    "kkkkkYYYYOk.",
+    "....kYYYOk..",
+    "...kYYYOk...",
+    "..kYYOk.....",
+    "..kYOk......",
+    ".kYOk.......",
+    ".kOk........",
+    ".kk.........",
+  ], { k: "#5a3200", y: "#fff6c4", Y: "#ffd23f", O: "#f08c1a" }, 15, 12);
+  // schwebt und wippt, ein Lichtschein pulsiert dahinter
+  function drawSpeedItem(g, X, Y, tick) {
+    const bob = Math.round(Math.sin(tick / 9) * 1.5), glow = 0.22 + 0.12 * Math.sin(tick / 6);
+    g.fillStyle = "rgba(255,226,120," + glow.toFixed(3) + ")";
+    for (let dy = -7; dy <= 7; dy++) { const hw = Math.round(Math.sqrt(49 - dy * dy)); g.fillRect(X + 8 - hw, Y + 8 + dy + bob, hw * 2, 1); }
+    g.drawImage(BOLT, X + 2, Y + bob);
+    if ((tick >> 3) % 3 === 0) { g.fillStyle = "#ffffff"; g.fillRect(X + 13, Y + 2 + bob, 1, 1); g.fillRect(X + 1, Y + 11 + bob, 1, 1); }
+  }
+
+  // Schleim: eine lila Pfütze auf dem Boden mit Tropfen über die Kante und aufsteigenden Blasen.
+  // X, Y: das Feld über dem Boden; links/rechts offen: dort läuft die Pfütze flach aus
+  const SLIME = { edge: "#4a0f6b", body: "#b23cf0", deep: "#8a22c4", light: "#dc8cff", shine: "#fbe9ff", aura: "rgba(214,120,255,0.28)" };
+  function drawSlime(g, X, Y, tick, c, openL, openR) {
+    const base = Y + T;
+    for (let i = 0; i < T; i++) {
+      // dicke, wabernde Oberfläche; an offenen Enden läuft die Pfütze rund aus
+      let h = 6 + ((hash(c * T + i, 5) * 2) | 0) + (Math.sin((tick + i * 6 + c * 13) / 12) > 0.4 ? 1 : 0);
+      if (openL && i < 4) h = Math.min(h, [2, 4, 5, 6][i]);
+      if (openR && i > T - 5) h = Math.min(h, [6, 5, 4, 2][i - (T - 4)]);
+      g.fillStyle = SLIME.aura; g.fillRect(X + i, base - h - 4, 1, 3);
+      g.fillStyle = SLIME.edge; g.fillRect(X + i, base - h - 1, 1, 1);
+      g.fillStyle = SLIME.body; g.fillRect(X + i, base - h, 1, h);
+      g.fillStyle = SLIME.light; g.fillRect(X + i, base - h, 1, 1);
+      g.fillStyle = SLIME.deep; g.fillRect(X + i, base - 2, 1, 2);
+    }
+    g.fillStyle = SLIME.shine; g.fillRect(X + 3, base - 5, 2, 1); g.fillRect(X + 4, base - 4, 1, 1); g.fillRect(X + 11, base - 6, 1, 1);
+    // Tropfen über die Bodenkante
+    for (let k = 0; k < 2; k++) {
+      const i = 2 + ((hash(c, k + 3) * 12) | 0), len = 2 + (((tick / 18) + hash(c, k) * 7) | 0) % 4;
+      g.fillStyle = SLIME.body; g.fillRect(X + i, base, 2, len - 1); g.fillRect(X + i, base + len - 1, 1, 1);
+      g.fillStyle = SLIME.light; g.fillRect(X + i, base + len - 1, 1, 1);
+    }
+    // eine Blase steigt auf und platzt
+    const ph = (tick + c * 37) % 80;
+    if (ph < 34) {
+      const bx = X + 4 + ((hash(c, 9) * 8) | 0), by = Math.round(base - 8 - ph / 4);
+      g.fillStyle = SLIME.shine;
+      g.fillRect(bx, by - 2, 2, 1); g.fillRect(bx - 1, by - 1, 1, 2); g.fillRect(bx + 2, by - 1, 1, 2); g.fillRect(bx, by + 1, 2, 1);
+    }
+  }
 
   function themeTiles(name) {
     const th = THEME[name];
@@ -985,7 +1046,7 @@
     x.fillRect(0, 0, s.cols, ROWS);
     for (let r = 0; r < ROWS; r++) for (let col = 0; col < s.cols; col++) {
       const t = s.grid[r][col];
-      const color = t === "#" ? th.miniGround : t === "R" ? th.miniRock : t === "B" || t === "b" ? th.miniBrick : t === "Q" || t === "P" ? "#4fb8dc" : t === "o" ? "#f0b43c" : t === "~" ? "#3f86c4" : null;
+      const color = t === "#" ? th.miniGround : t === "R" ? th.miniRock : t === "B" || t === "b" ? th.miniBrick : t === "Q" || t === "P" ? "#4fb8dc" : t === "o" ? "#f0b43c" : t === "~" ? "#3f86c4" : t === "s" ? "#fff6c4" : t === "x" ? "#b04dff" : null;
       if (color) { x.fillStyle = color; x.fillRect(col, r, 1, 1); }
     }
     x.fillStyle = "#d9a55a";
@@ -1018,7 +1079,7 @@
     P: "###.#..####.#...#...", Q: ".##.#..##..##.#..#.#", R: "###.#..####.#.#.#..#", S: ".####....##....####.", T: "###..#...#...#...#..",
     U: "#..##..##..##..#.##.", V: "#..##..##..#.##..##.", W: "#...##...##.#.###.###...#", X: "#..#.##..##..##.#..#", Y: "#.#.#.#..#...#...#..",
     Z: "####...#.##.#...####", 0: ".##.#..##..##..#.##.", 1: ".#..##...#...#..###.", 2: "###....#.##.#...####", 3: "###....#.##....####.",
-    4: "#..##..#####...#...#", 5: "#####...###....####.", 6: ".##.#...###.#..#.##.", 7: "####...#..#..#...#..", 8: ".##.#..#.##.#..#.##.", 9: ".##.#..#.###...#.##.",
+    "!": "###.#", 4: "#..##..#####...#...#", 5: "#####...###....####.", 6: ".##.#...###.#..#.##.", 7: "####...#..#..#...#..", 8: ".##.#..#.##.#..#.##.", 9: ".##.#..#.###...#.##.",
   };
   const glyphW = (ch) => (GLYPH[ch] ? GLYPH[ch].length / 5 : 3);
   function textWidth(text) {
@@ -1026,12 +1087,13 @@
     for (const ch of text) w += glyphW(ch) + 1;
     return Math.max(0, w - 1);
   }
-  function drawText(g, text, x, y, color) {
+  function drawText(g, text, x, y, color, scale) {
+    const k = scale || 1;
     g.fillStyle = color;
     for (const ch of text) {
       const gl = GLYPH[ch], gw = glyphW(ch);
-      if (gl) for (let i = 0; i < gl.length; i++) if (gl[i] === "#") g.fillRect(x + (i % gw), y + Math.floor(i / gw), 1, 1);
-      x += gw + 1;
+      if (gl) for (let i = 0; i < gl.length; i++) if (gl[i] === "#") g.fillRect(x + (i % gw) * k, y + Math.floor(i / gw) * k, k, k);
+      x += (gw + 1) * k;
     }
   }
   // Initialen aus „Lena K.“ → „LK“, Umlaute ohne Punkte; mehrfach vorkommende Namen tragen eine Zahl („Lena K. 2“)
@@ -1057,6 +1119,8 @@
 
   // eine Kachel in Kontext g; above ist die Kachel eine Zeile höher (Gras und Wasseroberfläche brauchen sie)
   function paintTile(g, th, tiles, t, above, c, r, X, Y, tick) {
+    if (t === "s") return drawSpeedItem(g, X, Y, tick);
+    if (t === "x") return drawSlime(g, X, Y, tick, c, true, true);
     if (t === "#") g.drawImage((SOLID.has(above) ? tiles.groundFill : tiles.groundTop)[(hash(c, r) * 4) | 0], X, Y);
     else if (t === "R") g.drawImage(tiles.rock, X, Y);
     else if (t === "B" || t === "b") g.drawImage(tiles.brick, X, Y);
@@ -1126,8 +1190,8 @@
   }
 
   // Bild einer Figur; color 0–3
-  function figureImage(p, color) {
-    const N = NURSES[color] || NURSES[0];
+  function figureImage(p, color, gold) {
+    const N = gold ? NURSE_GOLD : NURSES[color] || NURSES[0];
     let big = p.big;
     if (p.freezeKind === "grow" || p.freezeKind === "shrink") big = (p.freeze >> 2) % 2 === (p.freezeKind === "grow" ? 0 : 1);
     if (p.status === "dead" || p.freezeKind === "die") return { img: N.dead, big: false };
@@ -1137,9 +1201,26 @@
   function drawFigure(g, p, cam, color, alpha, tick) {
     if (p.status === "done") return;
     if (p.hurt > 0 && (tick >> 1) % 2) return;
-    const f = figureImage(p, color);
-    if (alpha < 1) g.globalAlpha = alpha;
-    g.drawImage(f.img, Math.round(p.x + p.w / 2 - f.img.width / 2 - cam), Math.round(p.y + p.h - NURSE_GROUND[f.big ? "big" : "small"]));
+    // Speed-Item: Nachbilder hinter der Figur und Flackern zwischen Farbe und Gold, zum Ende hin langsamer
+    const speed = p.speedT > 0 && p.status === "play";
+    const gold = speed && ((tick >> (p.speedT < 120 ? 3 : 1)) & 1) === 1;
+    const f = figureImage(p, color, gold);
+    const X = Math.round(p.x + p.w / 2 - f.img.width / 2 - cam), Y = Math.round(p.y + p.h - NURSE_GROUND[f.big ? "big" : "small"]);
+    if (speed && Math.abs(p.vx) > 0.5) {
+      const ghost = figureImage(p, color, true).img;
+      for (const [k, a] of [[9, 0.16], [5, 0.3]]) { g.globalAlpha = a * alpha; g.drawImage(ghost, Math.round(X - p.vx * k), Y); }
+    }
+    g.globalAlpha = alpha;
+    g.drawImage(f.img, X, Y);
+    // Schleim klebt an den Füßen und tropft
+    if (p.slowT > 0 && p.status === "play") {
+      const fx = Math.round(p.x - cam), fy = Math.round(p.y + p.h);
+      g.fillStyle = SLIME.edge; g.fillRect(fx, fy - 4, p.w, 1);
+      g.fillStyle = SLIME.body; g.fillRect(fx, fy - 3, p.w, 3);
+      g.fillStyle = SLIME.light; g.fillRect(fx + 2, fy - 3, 3, 1);
+      const d = (tick >> 2) % 6;
+      if (!p.slimed) { g.fillStyle = SLIME.body; g.fillRect(fx + 3 + ((tick >> 5) % 6), fy + d, 1, 2); }
+    }
     g.globalAlpha = 1;
   }
   function figureTop(p) {
@@ -1150,7 +1231,7 @@
   function makeView(cv) {
     const g = cv.getContext("2d", { alpha: false });
     g.imageSmoothingEnabled = false;
-    return { cv, g, particles: [], tick: 0 };
+    return { cv, g, particles: [], texts: [], tick: 0 };
   }
   function burst(view, x, y, n, colors, spread, up, size) {
     for (let i = 0; i < n; i++) {
@@ -1164,6 +1245,12 @@
   function stepParticles(view) {
     for (const q of view.particles) { q.x += q.vx; q.y += q.vy; q.vy += 0.15; q.life--; }
     view.particles = view.particles.filter((q) => q.life > 0 && q.y < VH + 4);
+    for (const t of view.texts) { t.y -= 0.5; t.life--; }
+    view.texts = view.texts.filter((t) => t.life > 0);
+  }
+  // Schrift, die über einer Stelle im Level aufsteigt und verblasst (z. B. „SPEED!“)
+  function floatText(view, x, y, text, color) {
+    view.texts.push({ x, y, text, color, life: 80 });
   }
   // Partikel zu einem Ereignis der Engine
   function eventFx(view, w, e) {
@@ -1174,6 +1261,14 @@
       case "coin": if (e.pop) burst(view, e.x + 8, e.y - 6, 6, ["#f0b43c", "#ffe9a8"], 1, 3.5, 2); break;
       case "bonus": burst(view, e.x + 7, e.y, 10, ["#8fe3ff", "#ffffff"], 2, 2.5); break;
       case "break": burst(view, e.x + 8, e.y + 8, 10, th.crumbs, 3, 4, 3); break;
+      case "slime":
+        burst(view, e.x, e.y - 2, 12, [SLIME.body, SLIME.light, SLIME.shine], 2.2, 2.2, 2);
+        floatText(view, e.x, e.y - 34, "SCHLEIM!", SLIME.light);
+        break;
+      case "speed":
+        burst(view, e.x + 8, e.y + 8, 16, ["#ffd23f", "#fff6c4", "#ffffff"], 3, 3, 2);
+        floatText(view, e.x + 8, e.y - 4, "SPEED!", "#ffd23f");
+        break;
     }
   }
 
@@ -1188,16 +1283,19 @@
     const hx = s.hutCol * T - cam;
     if (hx > -100 && hx < vw + 20) drawHut(g, hx, s.hutFloor * T, s.theme);
     for (const it of w.items) if (!it.gone && it.rise > 0) g.drawImage(CRYSTAL, Math.round(it.x - 1 - cam), Math.round(it.y - 1));
-    const c0 = Math.floor(cam / T), c1 = c0 + Math.ceil(vw / T);
+    const c0 = Math.floor(cam / T), c1 = c0 + Math.ceil(vw / T), slimes = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = c0; c <= c1; c++) {
         const t = E.tileAt(w, c, r);
-        if (t === "." || c < 0) continue;
+        if (t === "." || c < 0 || c >= s.cols) continue;
+        if (t === "x") { slimes.push([c, r]); continue; }
         const bump = w.bumps.find((b) => b.c === c && b.r === r);
         const dy = bump ? -Math.round(Math.sin(((8 - bump.t) / 8) * Math.PI) * 5) : 0;
         paintTile(g, th, tiles, t, E.tileAt(w, c, r - 1), c, r, c * T - cam, r * T + dy, tick);
       }
     }
+    // Schleim nach dem Boden zeichnen, damit die Tropfen über die Bodenkante hängen
+    for (const [c, r] of slimes) drawSlime(g, c * T - cam, r * T, tick, c, E.tileAt(w, c - 1, r) !== "x", E.tileAt(w, c + 1, r) !== "x");
     // nachwachsende Ziegel schimmern kurz vorher durch
     for (const b of w.regrow) if (b.t < 60 && (tick >> 2) % 2) { g.globalAlpha = 0.35; g.drawImage(tiles.brick, b.c * T - cam, b.r * T); g.globalAlpha = 1; }
     const fx = s.flagCol * T + 7 - cam, base = s.flagBaseRow * T;
@@ -1237,11 +1335,34 @@
       g.fillStyle = q.color;
       g.fillRect(Math.round(q.x - cam), Math.round(q.y), q.size, q.size);
     }
+    for (const t of view.texts) {
+      const tw = textWidth(t.text) * 2, x = Math.round(t.x - cam - tw / 2), y = Math.round(t.y);
+      g.globalAlpha = Math.min(1, t.life / 25);
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [2, 2]]) drawText(g, t.text, x + dx, y + dy, "#2a1a00", 2);
+      drawText(g, t.text, x, y, t.color, 2);
+      g.globalAlpha = 1;
+    }
     if (opts.coins != null) {
       g.fillStyle = "rgba(13,14,18,0.35)"; g.fillRect(8, 8, 30, 11);
       g.fillStyle = "#f0b43c"; g.fillRect(12, 10, 4, 7);
       g.fillStyle = "#ffe9a8"; g.fillRect(12, 10, 1, 4);
       drawNumber(g, String(opts.coins).padStart(2, "0"), 20, 11, "#ffffff");
+    }
+    // wie lange der Schleim noch bremst: ein lila Balken unter den Münzen (unter dem Speed-Balken, falls beides)
+    if (opts.slow > 0) {
+      const y = opts.speed > 0 ? 32 : 21;
+      g.fillStyle = "rgba(13,14,18,0.45)"; g.fillRect(8, y, 46, 9);
+      g.fillStyle = SLIME.body; g.fillRect(11, y + 3, 4, 4); g.fillRect(12, y + 2, 2, 1);
+      g.fillStyle = SLIME.shine; g.fillRect(12, y + 3, 1, 1);
+      g.fillStyle = SLIME.edge; g.fillRect(18, y + 3, 33, 3);
+      g.fillStyle = SLIME.light; g.fillRect(18, y + 3, Math.max(1, Math.round(33 * opts.slow)), 3);
+    }
+    // wie lange das Speed-Item noch wirkt: ein kleiner Blitz mit Balken unter den Münzen
+    if (opts.speed > 0) {
+      g.fillStyle = "rgba(13,14,18,0.45)"; g.fillRect(8, 21, 46, 9);
+      g.drawImage(BOLT, 0, 0, 12, 15, 10, 22, 5, 7);
+      g.fillStyle = "#5a3200"; g.fillRect(18, 24, 33, 3);
+      g.fillStyle = opts.speed < 0.2 && (tick >> 3) % 2 ? "#ffffff" : "#ffd23f"; g.fillRect(18, 24, Math.max(1, Math.round(33 * opts.speed)), 3);
     }
   }
 
@@ -1269,7 +1390,7 @@
 
   window.JRG = {
     COLORS, THEME, BG, NURSE_GROUND, makeView, drawWorld, drawCard, drawFigure, drawTag, drawText, textWidth, initials,
-    miniMap, burst, stepParticles, eventFx, portrait, figureTop, heroFrame, TILES, BUGS, SNAILS, CRYSTAL, drawHut, drawLift, drawPole,
+    miniMap, burst, stepParticles, eventFx, floatText, BOLT, drawSlime, portrait, figureTop, heroFrame, TILES, BUGS, SNAILS, CRYSTAL, drawHut, drawLift, drawPole,
     paintTile: (g, theme, t, above, c, r, X, Y, tick) => paintTile(g, THEME[theme] || THEME.meadow, TILES[theme] || TILES.meadow, t, above, c, r, X, Y, tick),
   };
 })();

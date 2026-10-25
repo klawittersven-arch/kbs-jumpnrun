@@ -29,8 +29,10 @@
   };
   const SMALL_H = 22, BIG_H = 28;
   const SOLID = new Set(["#", "R", "B", "b", "Q", "P", "U"]);
-  // "U" (ein geleerter Block) entsteht erst beim Spielen; "~" ist Wasser, sieht aus wie ein Bach, trägt aber nicht
-  const TILE_CHARS = ".#RBbQPo~";
+  // "U" (ein geleerter Block) entsteht erst beim Spielen; "~" ist Wasser, sieht aus wie ein Bach, trägt aber nicht;
+  // "s" ist das Speed-Item: wer es einsammelt, rennt 10 Sekunden lang;
+  // "x" ist Schleim, eine Pfütze auf dem Boden darunter: wer hineintritt, wird sehr langsam
+  const TILE_CHARS = ".#RBbQPo~sx";
   const MIN_COLS = 24, MAX_COLS = 400, MAX_ENEMIES = 160, MAX_LIFTS = 40, NAME_MAX = 24, MAX_STAGES = 12;
   // Lifte fahren ewig ihre Spalte hinauf oder hinunter: wer den Bildschirm verlässt, kommt auf der anderen Seite wieder
   const LIFT_W = 3, LIFT_H = 8, LIFT_V = 1, LIFT_LOOP = VH + 32;
@@ -39,6 +41,8 @@
   const STAGE_PAUSE = 90; // Frames der Etappenkarte zwischen zwei Etappen
   const RESPAWN_AFTER = 240; // spätestens so viele Frames nach einem verlorenen Leben beginnt die Etappe neu
   const REGROW = 240; // im Finale wachsen zerschlagene Ziegel nach 4 Sekunden nach
+  const SPEED_T = 600; // so viele Frames rennt die Figur nach dem Speed-Item
+  const SLIME_AFTER = 120, SLIME_MAX = 0.5; // im Schleim und 2 Sekunden danach höchstens 0,5 px pro Frame
 
   // ---------------------------------------------------------------- Leveldaten
   // Ein Level (eine Etappe), wie es gespeichert und im Editor bearbeitet wird:
@@ -126,6 +130,8 @@
       runT: 0, fast: false, g: PH.fallG[0], fallG: PH.fallG[0], jumpY: 0, big, hurt: 0, anim: 0, skid: false,
       lift: -1, // Index des Lifts, auf dem die Figur steht
       cam: 0, status: "play", freeze: 0, freezeKind: "", poleT: 0, poleWait: 0, goneSent: false, coins: carry.coins || 0,
+      speedT: 0, // Frames, die das Speed-Item noch wirkt
+      slowT: 0, slimed: false, // Frames, die der Schleim noch bremst; steht die Figur gerade im Schleim?
     };
   }
   function createWorld(s, opts) {
@@ -173,8 +179,8 @@
 
   function tileAt(w, c, r) {
     if (r < 0 || r >= ROWS) return ".";
-    if (c < 0) return "#"; // Wand links vom Start
-    if (c >= w.s.cols) return ".";
+    // links vom Start und rechts vom Levelende steht eine Wand: niemand fällt aus dem Level
+    if (c < 0 || c >= w.s.cols) return "#";
     const m = w.mods.get(r * w.s.cols + c);
     return m !== undefined ? m : w.s.grid[r][c];
   }
@@ -212,6 +218,19 @@
 
   function playerStep(w, p, inp, ev) {
     const dir = inp.left === inp.right ? 0 : inp.right ? 1 : -1;
+    // mit dem Speed-Item zählt „Rennen“ als gedrückt, auch dort, wo man sonst nur gehen kann
+    let run = inp.b;
+    if (p.speedT > 0) {
+      run = true;
+      if (--p.speedT === 0) ev.push({ t: "speedEnd", s: p.slot });
+    }
+    // Schleim: wer darin steht, klebt fest; nach dem Verlassen bremst er noch 2 Sekunden (Springen geht normal)
+    const slimed = p.onGround && onSlime(w, p);
+    if (slimed) {
+      if (!p.slimed) ev.push({ t: "slime", s: p.slot, x: p.x + p.w / 2, y: p.y + p.h });
+      p.slowT = SLIME_AFTER;
+    } else if (p.slowT > 0) p.slowT--;
+    p.slimed = slimed;
     if (p.runT > 0) p.runT--;
     // ein Sprung braucht einen neuen Druck auf „Springen“ im Stehen; seine Kraft hängt vom Anlauf ab
     if (inp.aPressed && p.onGround) {
@@ -229,12 +248,13 @@
       if (sp >= PH.fastFrom) p.fast = true;
       else if (dir !== 0 && dir === p.moving) p.fast = false;
       // langsam dreht ein Druck in die andere Richtung auf der Stelle
-      if ((dir !== 0 || inp.b) && dir !== p.moving && sp < PH.turnBelow) { p.moving = p.facing; p.vx = 0; }
-      if (dir !== 0 && dir === p.moving && inp.b) p.runT = PH.runLinger;
-      if (dir !== 0 && dir === p.moving && (inp.b || p.runT > 0)) { max = PH.maxRun; acc = PH.accRun; }
+      if ((dir !== 0 || run) && dir !== p.moving && sp < PH.turnBelow) { p.moving = p.facing; p.vx = 0; }
+      if (dir !== 0 && dir === p.moving && run) p.runT = PH.runLinger;
+      if (dir !== 0 && dir === p.moving && (run || p.runT > 0)) { max = PH.maxRun; acc = PH.accRun; }
       else { max = PH.maxWalk; acc = p.fast || sp >= PH.fasterFrom ? PH.accFast : PH.accWalk; }
     } else if (sp >= PH.airRunFrom) { max = PH.maxRun; acc = PH.accRun; }
     else { max = PH.maxWalk; acc = PH.accWalk; }
+    if (p.slowT > 0) max = Math.min(max, SLIME_MAX);
     if (p.facing !== p.moving) acc *= 2; // Bremsen geht doppelt so schnell
     // am Boden ändert sich das Tempo immer, in der Luft nur beim Steuern
     if (p.onGround || dir !== 0) {
@@ -243,6 +263,7 @@
       else if (p.vx > 0) p.vx = Math.max(p.vx - acc, 0);
       else if (p.vx < 0) p.vx = Math.min(p.vx + acc, 0);
     }
+    if (slimed && Math.abs(p.vx) > SLIME_MAX) p.vx = p.vx > 0 ? SLIME_MAX : -SLIME_MAX; // im Schleim kein Rutschen
     if (p.vx > 0) p.moving = 1;
     else if (p.vx < 0) p.moving = -1;
     p.skid = p.onGround && dir !== 0 && dir !== p.moving && Math.abs(p.vx) > 0.5;
@@ -267,6 +288,13 @@
       else landLift(w, p, vy);
     }
     p.anim += Math.abs(p.vx);
+  }
+
+  // steht die Figur in einer Schleimpfütze? (die Pfütze liegt im Feld über dem Boden, in Höhe der Füße)
+  function onSlime(w, p) {
+    const r = Math.floor((p.y + p.h - 0.01) / T);
+    for (let c = Math.floor(p.x / T); c <= Math.floor((p.x + p.w - 0.01) / T); c++) if (tileAt(w, c, r) === "x") return true;
+    return false;
   }
 
   // ---- Lifte: Plattformen, auf denen man von oben landet und durch die man von unten hindurchspringt
@@ -453,7 +481,9 @@
     }
     for (let c = Math.floor(p.x / T); c <= Math.floor((p.x + p.w - 0.01) / T); c++) {
       for (let r = Math.floor(p.y / T); r <= Math.floor((p.y + p.h - 0.01) / T); r++) {
-        if (tileAt(w, c, r) === "o") { setTile(w, c, r, "."); p.coins++; ev.push({ t: "coin", s: p.slot, x: c * T, y: r * T }); }
+        const t = tileAt(w, c, r);
+        if (t === "o") { setTile(w, c, r, "."); p.coins++; ev.push({ t: "coin", s: p.slot, x: c * T, y: r * T }); }
+        else if (t === "s") { setTile(w, c, r, "."); p.speedT = SPEED_T; ev.push({ t: "speed", s: p.slot, x: c * T, y: r * T }); }
       }
     }
     // Gegnerkontakt zählt nur jeden zweiten Frame, wie im Original
@@ -506,11 +536,14 @@
     if (p.y > VH + 40 && !p.goneSent) { p.goneSent = true; ev.push({ t: "gone", s: p.slot }); }
   }
 
+  // Die Fahnenstange zählt in jeder Höhe über dem Boden: Wer über ihre Spitze springt, greift die Spitze.
+  // So kann niemand die Fahne überspringen, auch nicht mit Anlauf von einer hohen Treppe oder mit dem Speed-Item.
   function checkFlag(w, p, ev) {
     const s = w.s, px = s.flagCol * T + 7;
-    if (p.x + p.w >= px && p.x <= px + 2 && p.y + p.h > 2 * T && p.y < s.flagBaseRow * T) {
+    if (p.x + p.w >= px && p.x <= px + 2 && p.y < s.flagBaseRow * T) {
       p.status = "pole";
       p.poleT = 0;
+      if (p.y < 2 * T) p.y = 2 * T;
       p.vx = 0; p.vy = 0; p.x = px - p.w + 2; p.onGround = false; p.lift = -1;
       w.flagDown = true;
       ev.push({ t: "flag", s: p.slot });
@@ -803,7 +836,7 @@
 
   return {
     T, VW, VH, ROWS, PH, SMALL_H, BIG_H, SOLID, TILE_CHARS, MIN_COLS, MAX_COLS, MAX_ENEMIES, MAX_LIFTS, NAME_MAX, MAX_STAGES,
-    LIFT_W, LIFT_H, LIFT_V, LIFT_LOOP, THEMES, ENEMY_KINDS, STAGE_PAUSE, RESPAWN_AFTER, REGROW,
+    LIFT_W, LIFT_H, LIFT_V, LIFT_LOOP, THEMES, ENEMY_KINDS, STAGE_PAUSE, RESPAWN_AFTER, REGROW, SPEED_T, SLIME_AFTER, SLIME_MAX,
     normalizeStage, normalizeLibrary, stageView, buildStages,
     makePlayer, createWorld, createSoloWorld, addPlayer, removePlayer, cloneWorld, tileAt, stepWorld,
     BIT, encodeInput, decodeInput, inputChar, charInput,

@@ -48,6 +48,9 @@
     go: () => tone(660, 660, 0.06, "square", 0.04),
     count: () => tone(440, 440, 0.12, "square", 0.05),
     start: () => tone(880, 880, 0.3, "square", 0.05),
+    speed: () => [523, 784, 1046, 1568].forEach((f, i) => tone(f, f * 1.06, 0.07, "square", 0.05, i * 0.045)),
+    speedEnd: () => tone(700, 300, 0.25, "triangle", 0.05),
+    slime: () => { tone(200, 70, 0.22, "square", 0.05); tone(120, 60, 0.3, "triangle", 0.08, 0.04); },
     fanfare: () => [523, 659, 784, 659, 784, 1046].forEach((f, i) => tone(f, f, i === 5 ? 0.5 : 0.14, "square", 0.05, i * 0.15)),
   };
 
@@ -55,6 +58,7 @@
   const EVENT_SFX = {
     jump: "jump", jumpBig: "jumpBig", kick: "kick", bump: "bump", thud: "thud", sprout: "sprout", grow: "grow", shrink: "shrink",
     stomp: "stomp", smack: "smack", shellWall: "thud", coin: "coin", bonus: "coin", break: "break", flag: "flag", die: "die",
+    speed: "speed", speedEnd: "speedEnd", slime: "slime",
   };
   function eventSound(e) { const k = EVENT_SFX[e.t]; if (k) SFX[k](); }
 

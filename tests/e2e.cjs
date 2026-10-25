@@ -209,7 +209,7 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     console.log("\n== Level-Editor nur für die Lehrkraft");
     await teacher.click("#btnEditor");
     await teacher.waitForSelector("#edCanvas");
-    ok(await teacher.locator(".tool").count() === 18, "Editor mit allen Werkzeugen");
+    ok(await teacher.locator(".tool").count() === 20, "Editor mit allen Werkzeugen");
     await teacher.fill("#edName", "Mein Level");
     await teacher.dispatchEvent("#edName", "change");
     const saved = await teacher.evaluate(() => JSON.parse(localStorage.getItem("jr.levels")).stages[0].name);

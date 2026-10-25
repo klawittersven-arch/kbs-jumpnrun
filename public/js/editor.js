@@ -11,7 +11,7 @@
     { id: "#", label: "Erde" }, { id: "R", label: "Fels" }, { id: "B", label: "Ziegel" },
     // weiche Trennstriche: lange Namen brechen in den schmalen Knöpfen um
     { id: "b", label: "Münz­ziegel" }, { id: "Q", label: "Münz­block" }, { id: "P", label: "Kristall­block" },
-    { id: "o", label: "Münze", sep: true }, { id: "~", label: "Wasser" },
+    { id: "o", label: "Münze", sep: true }, { id: "s", label: "Speed-Item" }, { id: "x", label: "Schleim" }, { id: "~", label: "Wasser" },
     { id: "walker", label: "Käfer", sep: true }, { id: "snail", label: "Schnecke" },
     { id: "liftUp", label: "Lift hoch", sep: true }, { id: "liftDown", label: "Lift runter" },
     { id: "start", label: "Start", sep: true }, { id: "flag", label: "Fahne" }, { id: "hut", label: "Hütte" },
@@ -100,6 +100,8 @@
             <li>Gegner setzt du in das Feld, in dem sie loslaufen. Sie laufen zuerst nach links.</li>
             <li>Die Fahnenstange reicht bis auf das angeklickte Feld. Danach geht die Figur allein zur Hütte.</li>
             <li>Eine Lücke im Boden ist ein Abgrund. Wasser ist nur Deko, wer hineinfällt, stürzt ab.</li>
+            <li>Das <b>Speed-Item</b> lässt die Figur 10 Sekunden lang rennen: schneller und mit höheren Sprüngen. Setz es an Stellen, die schwer zu erreichen sind.</li>
+            <li><b>Schleim</b> setzt du in das Feld direkt über dem Boden. Wer hineintritt, wird sehr langsam, auch noch 2 Sekunden danach. Gut ist Schleim, den man überspringen oder auf einem anderen Weg umgehen kann.</li>
             <li><b>Lifts</b> fahren endlos hoch oder runter. Ein Klick mit dem anderen Lift-Werkzeug dreht die Richtung um.</li>
             <li>Im Klassenmodus wird nur gegangen: ein Sprung reicht etwa 4 Felder hoch und 5 Felder weit. „Testen“ zeigt, ob das Level zu schaffen ist.</li>
             <li><kbd>Strg</kbd>+<kbd>Z</kbd> macht rückgängig, <kbd>Strg</kbd>+<kbd>Y</kbd> stellt wieder her.</li>
@@ -222,9 +224,14 @@
       for (let c = 0; c < d.cols; c++) {
         const t = d.rows[r][c];
         if (t === ".") continue;
+        if (t === "x") continue;
         G.paintTile(g, d.theme, t, r > 0 ? d.rows[r - 1][c] : ".", c, r, c * T, r * T, 0);
         badge(g, t, c * T, r * T);
       }
+    }
+    // Schleim nach dem Boden, damit die Tropfen über der Bodenkante liegen
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < d.cols; c++) {
+      if (d.rows[r][c] === "x") G.drawSlime(g, c * T, r * T, 0, c, d.rows[r][c - 1] !== "x", d.rows[r][c + 1] !== "x");
     }
     G.drawPole(g, d.flag[0] * T + 7, 2 * T + 2, (d.flag[1] + 1) * T, false, 0);
     for (const L of d.lifts || []) {
@@ -420,6 +427,9 @@
     if (fc <= sc) out.push("Die Fahne steht nicht rechts vom Start.");
     if (hc < fc) out.push("Die Hütte steht links der Fahne, das Level endet dann gleich an der Fahne.");
     if (d.cols * T < 427) out.push("Das Level ist schmaler als das Breitbild am Beamer, rechts bleibt dann ein Rand.");
+    let floating = 0;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < d.cols; c++) if (d.rows[r][c] === "x" && !solid(c, r + 1)) floating++;
+    if (floating) out.push(floating + "× Schleim ohne Boden darunter: Schleim wirkt nur, wenn man darin steht. Setz ihn direkt auf den Boden.");
     return out;
   }
   function renderPanel() {
@@ -480,6 +490,7 @@
         el.edTTime.textContent = P.fmt(st.phase === "count" ? 0 : rec.fin != null ? rec.fin : m.frame);
         el.edTMsg.innerHTML = st.phase === "count" ? `<div class="big">${Math.ceil(st.count / 60)}</div>`
           : rec.fin != null ? `<div class="big gold">Geschafft!</div><div class="sub">${P.fmt(rec.fin)}${rec.deaths ? " · " + rec.deaths + "× neu" : ""}</div>`
+          : P.speedNews(rec) ? `<div class="big gold">Speed!</div>`
           : rec.down ? `<div class="sub">Nochmal von vorn</div>` : "";
       },
     }).start();

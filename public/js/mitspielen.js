@@ -289,6 +289,7 @@
         if (st.phase === "count") say(String(Math.ceil(st.count / 60)), "Gleich geht's los");
         else if (m.frame < 40) say("Los!", "");
         else if (result) say("Ziel!", P.fmt(result.frames), true);
+        else if (P.speedNews(rec)) say("Speed!", "", true);
         else if (rec.down) say("", "Nochmal von vorn, die Uhr läuft weiter");
         else msgEl.innerHTML = "";
         if (st.phase === "over" && !endT) endT = performance.now();
@@ -342,7 +343,8 @@
       else if (rec.fin != null) {
         if (!race.finishedAt) { race.finishedAt = performance.now(); A.SFX.finish(); }
         say("Ziel!", P.fmt(rec.fin), true);
-      } else if (rec.down) say("", "Nochmal von vorn");
+      } else if (P.speedNews(rec)) say("Speed!", "", true);
+      else if (rec.down) say("", "Nochmal von vorn");
       else msgEl.innerHTML = "";
       // nach dem Ende kurz das Bild stehen lassen, dann das Ergebnis
       const done = race.done;

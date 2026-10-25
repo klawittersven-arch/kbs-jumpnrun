@@ -63,6 +63,13 @@ Den Editor öffnest du auf der Lehrer-Seite oben mit **Level-Editor**. Du kannst
 
 Mitgeliefert sind fünf Level: **Auftakt** (Wiese), **Stollen** (Bergwerk), **Nachtschicht** (Klinikflur bei Nacht), **Gletscherpfad** (Eis und Schnee) und **Weinberg** (Kochertal). Alle sind auch nur gehend zu schaffen.
 
+### Speed-Item und Schleim
+
+- **Speed-Item** (goldener Blitz): Wer ihn einsammelt, rennt 10 Sekunden lang, schneller und mit höheren Sprüngen. Auf dem Handy erscheint groß „Speed!“, die Figur flackert golden und zieht Nachbilder hinter sich her. Ein Balken unter den Münzen zeigt, wie lange es noch wirkt. In jedem Level liegt ein Blitz an einer Stelle, die schwer zu erreichen ist (zum Beispiel oben auf der Eisdecke oder per Lift über der Stollendecke).
+- **Schleim** (lila Pfütze am Boden): Wer hineintritt, klebt fest und wird sehr langsam, auch noch 2 Sekunden nach dem Verlassen. Springen geht normal. Jedes Level hat zwei Schleimstellen, die man überspringen oder auf einem anderen Weg umgehen kann (zum Beispiel oben über das Medikamentenregal).
+- Im gemeinsamen Level gehört der Blitz dem, der zuerst da ist. Den Schleim gibt es für alle.
+- Die **Fahnenstange** zählt in jeder Höhe: Auch wer von einer hohen Treppe oder mit Speed über ihre Spitze springt, greift die Fahne. Am rechten Levelrand steht eine Wand, niemand fällt aus dem Level.
+
 **Tipps**
 - Die Handys **quer** halten: Dann liegt das Steuerkreuz links und „Springen“ rechts vom Bild.
 - **Mehrere Klassen gleichzeitig:** Jede Lehrkraft öffnet einfach `/lehrer` und bekommt einen eigenen Code. Die Räume sind voneinander getrennt.
@@ -119,6 +126,7 @@ Voraussetzung: Handys und Laptop sind im selben WLAN, und das WLAN erlaubt Verbi
 **Tests**
 - `npm test`: Engine (verhält sich allein gespielt Frame für Frame wie das Einzelspiel, Abgleich mit vier Handys und Beamer) und Raum-Logik.
 - `node tools/bot.js --walk`: Ein Such-Bot prüft, ob jedes Level nur gehend zu schaffen ist. Den Lift-Abschnitt in „Stollen“ findet er allein nicht; er wurde abschnittsweise geprüft.
+- `node tools/bot.js --walk --items` prüft, ob jedes Speed-Item gehend erreichbar ist (Stollen abschnittsweise mit `node tools/stollen-item.js`), `node tools/bot.js --walk --schleim`, ob man allen Schleim vermeiden kann.
 - `node tests/e2e.cjs`: eine ganze Stunde im Browser mit Lehrer-Seite und vier Handys (braucht [Playwright](https://playwright.dev) mit Chromium).
 
 **Lizenzen:** Schriften Bungee, Rubik und Silkscreen unter SIL Open Font License (siehe `public/fonts/`). QR-Code-Generator von Kazuhiko Arase unter MIT-Lizenz (`public/js/qrcode.js`). Das Schullogo gehört der Karoline-Breitinger-Schule.

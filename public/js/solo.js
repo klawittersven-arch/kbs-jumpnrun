@@ -67,6 +67,7 @@
         if (st.phase === "count") msg.innerHTML = `<div class="big">${Math.ceil(st.count / 60)}</div>`;
         else if (m.frame < 40) msg.innerHTML = `<div class="big">Los!</div>`;
         else if (done) msg.innerHTML = `<div class="big gold">${done.pb ? "Bestzeit!" : "Ziel!"}</div><div class="sub">${P.fmt(done.frames)}${!done.pb ? " · Bestzeit " + P.fmt(done.best) : ""}</div>`;
+        else if (P.speedNews(rec)) msg.innerHTML = `<div class="big gold">Speed!</div>`;
         else if (rec.down) msg.innerHTML = `<div class="sub">Nochmal von vorn, die Uhr läuft weiter</div>`;
         else msg.innerHTML = "";
       },

@@ -164,5 +164,84 @@ console.log("\n== 4. Regeln im gemeinsamen Level");
   ok(!hit && m.recs[1].p.status === "play", "Panzer eines Mitspielers trifft nicht");
 }
 
+console.log("\n== 5. Speed-Item");
+{
+  const row = (s) => s.padEnd(200, ".");
+  const rows = [];
+  for (let r = 0; r < 13; r++) rows.push(row(r === 12 ? "....s" : ""));
+  rows.push("#".repeat(200), "#".repeat(200));
+  const st = E.buildStages(E.normalizeLibrary({ stages: [{ name: "Speed", theme: "meadow", cols: 200, rows, enemies: [], start: [2, 12], flag: [190, 12], hut: [194, 12] }] }));
+  // nur „rechts“, nie „rennen“: wie im Klassenmodus
+  const w = E.createSoloWorld(st, 0), right = { right: true };
+  let got = -1, end = -1, maxV = 0, maxAfter = 0;
+  for (let f = 0; f < 1000; f++) {
+    const ev = E.stepWorld(w, [right]);
+    if (ev.some((e) => e.t === "speed")) got = f;
+    if (ev.some((e) => e.t === "speedEnd")) end = f;
+    if (got >= 0 && end < 0) maxV = Math.max(maxV, w.p.vx);
+    if (end >= 0 && f > end + 120) maxAfter = Math.max(maxAfter, w.p.vx);
+  }
+  ok(got >= 0 && E.tileAt(w, 4, 12) === ".", "das Item wird beim Drüberlaufen eingesammelt");
+  ok(end - got === E.SPEED_T, "es wirkt genau " + E.SPEED_T / 60 + " Sekunden", { got, end });
+  ok(maxV === E.PH.maxRun && maxAfter === E.PH.maxWalk, "solange rennt die Figur (" + maxV + " px/Frame), danach geht sie wieder (" + maxAfter + ")");
+  // im gemeinsamen Level bekommt es nur, wer zuerst da ist
+  const m = E.createMatch(st, [0], 2, { shared: true, regrow: true });
+  for (let f = 0; f < 60; f++) E.stepMatch(m, [2, f < 20 ? 0 : 2]);
+  ok(m.recs[0].p.speedT > 0 && m.recs[1].p.speedT === 0, "im gemeinsamen Level gehört es dem, der zuerst da ist");
+}
+
+console.log("\n== 6. Schleim");
+{
+  const row = (s) => s.padEnd(120, ".");
+  const rows = [];
+  for (let r = 0; r < 13; r++) rows.push(row(r === 12 ? ".........xxxx" : ""));
+  rows.push("#".repeat(120), "#".repeat(120));
+  const st = E.buildStages(E.normalizeLibrary({ stages: [{ name: "Schleim", theme: "meadow", cols: 120, rows, enemies: [], start: [2, 12], flag: [110, 12], hut: [114, 12] }] }));
+  // hindurchlaufen
+  const w = E.createSoloWorld(st, 0);
+  let enter = -1, leave = -1, maxIn = 0, slowAfter = 0, fastAgain = -1;
+  for (let f = 0; f < 700; f++) {
+    const ev = E.stepWorld(w, [{ right: true }]);
+    if (ev.some((e) => e.t === "slime")) enter = f;
+    if (enter >= 0 && w.p.slimed) maxIn = Math.max(maxIn, w.p.vx);
+    if (enter >= 0 && leave < 0 && !w.p.slimed) leave = f;
+    if (leave >= 0 && f < leave + E.SLIME_AFTER - 2) slowAfter = Math.max(slowAfter, w.p.vx);
+    if (leave >= 0 && fastAgain < 0 && w.p.vx > E.SLIME_MAX + 0.01) fastAgain = f;
+  }
+  ok(enter >= 0 && maxIn <= E.SLIME_MAX, "im Schleim höchstens " + E.SLIME_MAX + " px pro Frame (statt 1,5)", { enter, maxIn });
+  ok(slowAfter <= E.SLIME_MAX && fastAgain - leave >= E.SLIME_AFTER - 1 && fastAgain - leave <= E.SLIME_AFTER + 2,
+    "nach dem Verlassen noch " + E.SLIME_AFTER / 60 + " Sekunden langsam, dann wieder normal", { leave, fastAgain });
+  // drüberspringen: kein Schleim
+  const w2 = E.createSoloWorld(st, 0);
+  let touched = false;
+  for (let f = 0; f < 300; f++) {
+    const jump = w2.p.x > 8 * 16 && w2.p.x < 8.75 * 16; // Absprung direkt vor dem Schleim
+    const ev = E.stepWorld(w2, [{ right: true, a: jump || !w2.p.onGround, aPressed: jump && w2.p.onGround }]);
+    if (ev.some((e) => e.t === "slime")) touched = true;
+  }
+  ok(!touched && w2.p.x > 14 * 16 && w2.p.slowT === 0, "wer darüber springt, bleibt schnell");
+}
+
+console.log("\n== 7. Die Fahne lässt sich nicht überspringen, niemand fällt aus dem Level");
+{
+  const lib = E.normalizeLibrary(require("../public/js/levels.js")), st = E.buildStages(lib);
+  // in jedem Level: mit Speed von links an die Stange fliegen, in jeder Höhe vom Boden bis weit über den Bildrand
+  let tries = 0, missed = [];
+  st.forEach((s, si) => {
+    for (let y = s.flagBaseRow * 16 - 30; y >= -120; y -= 6) {
+      const w = E.createSoloWorld(st, si), p = w.p;
+      p.x = s.flagCol * 16 - 40; p.y = y; p.vx = 2.5; p.vy = -2; p.onGround = false; p.speedT = 600; p.cam = Math.max(0, p.x - 112);
+      let flag = false;
+      for (let f = 0; f < 60 && !flag; f++) flag = E.stepWorld(w, [{ right: true, a: true }]).some((e) => e.t === "flag");
+      tries++;
+      if (!flag) missed.push(s.name + " y=" + y);
+    }
+  });
+  ok(!missed.length, tries + " Flüge in allen Leveln, jede Höhe: immer an der Fahne gefangen", missed.slice(0, 5));
+  // rechts vom Levelende ist eine Wand
+  const w = E.createSoloWorld(st, 0);
+  ok(E.tileAt(w, st[0].cols, 5) === "#" && E.tileAt(w, -1, 5) === "#", "links und rechts vom Level steht eine Wand");
+}
+
 console.log(`\n${checks - fails} von ${checks} Prüfungen bestanden.`);
 process.exit(fails ? 1 : 0);

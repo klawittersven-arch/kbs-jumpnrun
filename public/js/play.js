@@ -43,7 +43,7 @@
       figures.push({ p: o.p, color: colorOf(o.slot), tag: tagOf(o.slot), alpha: m.shared ? 0.9 : look.ghostAlpha || 0.45 });
     }
     figures.push({ p: rec.p, color: colorOf(rec.slot), tag: look.selfTag || "" });
-    G.drawWorld(view, w, { cam: rec.p.cam, figures, coins: rec.p.coins, won: rec.fin != null });
+    G.drawWorld(view, w, { cam: rec.p.cam, figures, coins: rec.p.coins, won: rec.fin != null, speed: rec.p.speedT / E.SPEED_T, slow: rec.p.slowT / E.SLIME_AFTER });
   }
 
   // ---------------------------------------------------------------- Lokales Rennen (ein Spieler)
@@ -222,5 +222,8 @@
     return B;
   }
 
-  window.JRP = { fmt, share, drawRec, localRace, netRace, beamer, FRAME_MS };
+  // gerade das Speed-Item eingesammelt? Dann steht anderthalb Sekunden lang „Speed!“ groß im Bild
+  const speedNews = (rec) => !!rec && !!rec.p && rec.p.speedT > E.SPEED_T - 90;
+
+  window.JRP = { fmt, share, drawRec, localRace, netRace, beamer, speedNews, FRAME_MS };
 })();

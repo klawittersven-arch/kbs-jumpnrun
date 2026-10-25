@@ -1,6 +1,8 @@
 // Such-Bot für Tests: findet mit einer Strahlsuche (beam search) einen Weg durch ein Level.
 // Damit prüfen die Tests, dass jedes Level schaffbar ist (auch nur gehend, wie im Klassenmodus).
-//   node tools/bot.js [--walk] [Levelnummer …]     prüft die Standard-Level
+//   node tools/bot.js [--walk] [Levelnummer …]     prüft die Standard-Level bis zur Fahne
+//   node tools/bot.js --walk --items [Levelnummer …]  prüft, ob jedes Speed-Item gehend erreichbar ist
+//   node tools/bot.js --walk --schleim [Levelnummer …]  prüft, ob man allen Schleim umgehen oder überspringen kann
 "use strict";
 const E = require("../public/js/engine.js");
 
@@ -16,10 +18,15 @@ function bits(a, f) {
 }
 
 // Ein Level allein spielen, bis die Fahne erreicht ist. Rückgabe: { inputs, flag, w } oder { failed, col }
+//   opts.goal(w, events): eigenes Ziel statt der Fahne; opts.score(w): kleiner ist besser (sonst: weiter rechts)
+//   opts.forbid(w): Stände, die nicht vorkommen dürfen (wie ein verlorenes Leben)
 function solveStage(stages, si, carry, opts) {
   opts = opts || {};
   const W = opts.width || 200, ACT = actions(opts.walk);
-  let beam = [{ w: E.createSoloWorld(stages, si, carry), path: [] }];
+  const goal = opts.goal || ((w, ev) => ev.some((e) => e.t === "flag"));
+  const order = opts.score ? (u, v) => opts.score(u.w) - opts.score(v.w) : (u, v) => v.w.p.x - u.w.p.x || u.w.p.y - v.w.p.y;
+  // opts.start: von einem bereits gespielten Stand aus weitersuchen
+  let beam = [{ w: opts.start ? E.cloneWorld(opts.start) : E.createSoloWorld(stages, si, carry), path: [] }];
   let furthest = -1;
   for (let step = 0; step < (opts.steps || 900) && beam.length; step++) {
     const next = [];
@@ -31,8 +38,8 @@ function solveStage(stages, si, carry, opts) {
         const v = bits(a, f);
         path.push(v); used++;
         const ev = E.stepWorld(w, [E.decodeInput(v)]);
-        if (ev.some((e) => e.t === "die")) { dead = true; break; }
-        if (ev.some((e) => e.t === "flag")) { flag = true; break; }
+        if (ev.some((e) => e.t === "die") || (opts.forbid && opts.forbid(w))) { dead = true; break; }
+        if (goal(w, ev)) { flag = true; break; }
       }
       if (dead) continue;
       if (flag) return { inputs: path, w };
@@ -40,7 +47,7 @@ function solveStage(stages, si, carry, opts) {
     }
     // wer schon in einen Abgrund fällt, kommt zuletzt, so übersteht Warten auf einen Lift das Aussieben
     const doomed = (w) => (w.p.y + w.p.h > 212 && w.p.lift < 0 ? 1 : 0);
-    next.sort((u, v) => doomed(u.w) - doomed(v.w) || v.w.p.x - u.w.p.x || u.w.p.y - v.w.p.y);
+    next.sort((u, v) => doomed(u.w) - doomed(v.w) || order(u, v));
     for (const s of next) furthest = Math.max(furthest, Math.floor(s.w.p.x / 16));
     const seen = new Set();
     beam = [];
@@ -85,6 +92,39 @@ if (require.main === module) {
   const lib = E.normalizeLibrary(require("../public/js/levels.js"));
   const stages = E.buildStages(lib);
   const only = process.argv.slice(2).filter((a) => /^\d+$/.test(a)).map(Number);
+  if (process.argv.includes("--schleim")) {
+    for (const si of only.length ? only : stages.map((_, i) => i)) {
+      let last = -1;
+      lib.stages[si].rows.forEach((row) => { const i = row.lastIndexOf("x"); if (i > last) last = i; });
+      if (last < 0) continue;
+      const t0 = Date.now();
+      const res = solveStage(stages, si, {}, {
+        walk, width: +process.env.WIDTH || 200, steps: 900,
+        goal: (w) => w.p.x > (last + 2) * 16 && w.p.status === "play",
+        forbid: (w) => w.p.slowT > 0,
+      });
+      console.log(`Level ${si + 1} (${lib.stages[si].name}): bis hinter den letzten Schleim (Spalte ${last}) ` +
+        (res.failed ? "NICHT ohne Schleim geschafft, weiteste Spalte " + res.col : `ohne Schleim geschafft nach ${(res.inputs.length / 60).toFixed(2)} s${walk ? " gehend" : ""}`) +
+        `, Suche ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    }
+    process.exit(0);
+  }
+  if (process.argv.includes("--items")) {
+    for (const si of only.length ? only : stages.map((_, i) => i)) {
+      lib.stages[si].rows.forEach((row, r) => [...row].forEach((ch, c) => {
+        if (ch !== "s") return;
+        const t0 = Date.now(), tx = c * 16 + 8, ty = r * 16 + 8;
+        const res = solveStage(stages, si, {}, {
+          walk, width: +process.env.WIDTH || 300, steps: 700,
+          goal: (w) => E.tileAt(w, c, r) !== "s",
+          score: (w) => Math.abs(w.p.x + 6 - tx) + Math.abs(w.p.y + w.p.h / 2 - ty) * 1.5,
+        });
+        console.log(`Level ${si + 1} (${lib.stages[si].name}), Speed-Item in Spalte ${c}, Zeile ${r}: ` +
+          (res.failed ? "NICHT erreicht" : `erreicht nach ${(res.inputs.length / 60).toFixed(2)} s${walk ? " gehend" : ""}`) + `, Suche ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+      }));
+    }
+    process.exit(0);
+  }
   for (const si of only.length ? only : stages.map((_, i) => i)) {
     const t0 = Date.now();
     const r = solveStage(stages, si, {}, { walk, width: +process.env.WIDTH || 200 });
