@@ -113,14 +113,21 @@ if (require.main === module) {
     for (const si of only.length ? only : stages.map((_, i) => i)) {
       lib.stages[si].rows.forEach((row, r) => [...row].forEach((ch, c) => {
         if (ch !== "s") return;
-        const t0 = Date.now(), tx = c * 16 + 8, ty = r * 16 + 8;
-        const res = solveStage(stages, si, {}, {
-          walk, width: +process.env.WIDTH || 300, steps: 700,
-          goal: (w) => E.tileAt(w, c, r) !== "s",
-          score: (w) => Math.abs(w.p.x + 6 - tx) + Math.abs(w.p.y + w.p.h / 2 - ty) * 1.5,
+        const t0 = Date.now(), tx = c * 16 + 8, ty = r * 16 + 8, goal = (w) => E.tileAt(w, c, r) !== "s";
+        // Phase 1: wie bei der Fahne nach rechts bis kurz vor das Item; Phase 2: hin zum Item, dabei zählt Höhe
+        // mehr als Abstand (sonst wartet die Suche unter dem Item, statt über Umwege hinaufzuklettern)
+        let pre = { inputs: [], w: null };
+        if (c > 14) {
+          pre = solveStage(stages, si, {}, { walk, width: 200, steps: 900, goal: (w) => goal(w) || w.p.x >= (c - 12) * 16 });
+          if (pre.failed) pre = { inputs: [], w: null };
+        }
+        let res = pre.w && goal(pre.w) ? { inputs: [] } : solveStage(stages, si, {}, {
+          start: pre.w || undefined, walk, width: +process.env.WIDTH || 500, steps: 500, goal,
+          score: (w) => { const py = w.p.y + w.p.h / 2; return Math.abs(w.p.x + 6 - tx) * 0.7 + Math.max(0, py - ty) * 2.5 + Math.max(0, ty - py); },
         });
+        const all = res.failed ? null : pre.inputs.concat(res.inputs);
         console.log(`Level ${si + 1} (${lib.stages[si].name}), Speed-Item in Spalte ${c}, Zeile ${r}: ` +
-          (res.failed ? "NICHT erreicht" : `erreicht nach ${(res.inputs.length / 60).toFixed(2)} s${walk ? " gehend" : ""}`) + `, Suche ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+          (!all ? "NICHT erreicht" : `erreicht nach ${(all.length / 60).toFixed(2)} s${walk ? " gehend" : ""}`) + `, Suche ${((Date.now() - t0) / 1000).toFixed(1)} s`);
       }));
     }
     process.exit(0);
