@@ -733,6 +733,31 @@
     if ((tick >> 3) % 3 === 0) { g.fillStyle = "#ffffff"; g.fillRect(X + 13, Y + 2 + bob, 1, 1); g.fillRect(X + 1, Y + 11 + bob, 1, 1); }
   }
 
+  // Stachelkugel: eiserne Kugel mit acht spitzen Stacheln; zwei Bilder (gedreht). Auf hellen Themen dunkler Umriss,
+  // auf dunklen Themen ein heller Rand, damit sie überall gut zu sehen ist
+  function spikeBall(turn, dark) {
+    const c = canvas(16, 16), x = c.getContext("2d");
+    const px = (X, Y, col) => { if (X >= 0 && Y >= 0 && X < 16 && Y < 16) { x.fillStyle = col; x.fillRect(X, Y, 1, 1); } };
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4 + Math.PI / 2, long = (k % 2 === 0) !== !!turn, tip = long ? 8.2 : 7.2;
+      const dx = Math.cos(a), dy = -Math.sin(a), nx = -dy, ny = dx;
+      for (let t = 4.6; t <= tip; t += 0.2) {
+        const hw = 1.15 * (1 - (t - 4.6) / (tip - 4.6));
+        for (let o = -hw; o <= hw; o += 0.3) px(Math.floor(7.5 + dx * t + nx * o + 0.5), Math.floor(7.5 + dy * t + ny * o + 0.5), o < 0 ? "#a9b2c3" : "#e6ebf2");
+      }
+      px(Math.floor(7.5 + dx * tip + 0.5), Math.floor(7.5 + dy * tip + 0.5), "#ffffff");
+    }
+    for (let Y = 0; Y < 16; Y++) for (let X = 0; X < 16; X++) {
+      const ddx = X - 7.5, ddy = Y - 7.5, d = Math.hypot(ddx, ddy);
+      if (d > 5.4) continue;
+      const lit = -(ddx + ddy) / 7.6;
+      px(X, Y, d > 4.7 ? "#262b35" : lit > 0.4 ? "#949eb1" : lit > 0.05 ? "#636c7e" : "#454c5c");
+    }
+    px(5, 5, "#eef2f7"); px(6, 5, "#c7cedb"); px(5, 6, "#c7cedb");
+    return outlined(c, dark ? "#d9dee8" : "#121419", 16);
+  }
+  const SPIKES = { light: [spikeBall(0, false), spikeBall(1, false)], dark: [spikeBall(0, true), spikeBall(1, true)] };
+
   // Schleim: eine lila Pfütze auf dem Boden mit Tropfen über die Kante und aufsteigenden Blasen.
   // X, Y: das Feld über dem Boden; links/rechts offen: dort läuft die Pfütze flach aus
   const SLIME = { edge: "#4a0f6b", body: "#b23cf0", deep: "#8a22c4", light: "#dc8cff", shine: "#fbe9ff", aura: "rgba(214,120,255,0.28)" };
@@ -1046,7 +1071,7 @@
     x.fillRect(0, 0, s.cols, ROWS);
     for (let r = 0; r < ROWS; r++) for (let col = 0; col < s.cols; col++) {
       const t = s.grid[r][col];
-      const color = t === "#" ? th.miniGround : t === "R" ? th.miniRock : t === "B" || t === "b" ? th.miniBrick : t === "Q" || t === "P" ? "#4fb8dc" : t === "o" ? "#f0b43c" : t === "~" ? "#3f86c4" : t === "s" ? "#fff6c4" : t === "x" ? "#b04dff" : null;
+      const color = t === "#" ? th.miniGround : t === "R" ? th.miniRock : t === "B" || t === "b" ? th.miniBrick : t === "Q" || t === "P" ? "#4fb8dc" : t === "o" ? "#f0b43c" : t === "~" ? "#3f86c4" : t === "s" ? "#fff6c4" : t === "x" ? "#b04dff" : t === "*" ? "#ff5a5a" : null;
       if (color) { x.fillStyle = color; x.fillRect(col, r, 1, 1); }
     }
     x.fillStyle = "#d9a55a";
@@ -1121,6 +1146,7 @@
   function paintTile(g, th, tiles, t, above, c, r, X, Y, tick) {
     if (t === "s") return drawSpeedItem(g, X, Y, tick);
     if (t === "x") return drawSlime(g, X, Y, tick, c, true, true);
+    if (t === "*") return g.drawImage(SPIKES[th.dark ? "dark" : "light"][(tick >> 4) & 1], X, Y);
     if (t === "#") g.drawImage((SOLID.has(above) ? tiles.groundFill : tiles.groundTop)[(hash(c, r) * 4) | 0], X, Y);
     else if (t === "R") g.drawImage(tiles.rock, X, Y);
     else if (t === "B" || t === "b") g.drawImage(tiles.brick, X, Y);

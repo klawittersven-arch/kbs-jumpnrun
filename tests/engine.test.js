@@ -222,7 +222,40 @@ console.log("\n== 6. Schleim");
   ok(!touched && w2.p.x > 14 * 16 && w2.p.slowT === 0, "wer darüber springt, bleibt schnell");
 }
 
-console.log("\n== 7. Die Fahne lässt sich nicht überspringen, niemand fällt aus dem Level");
+console.log("\n== 7. Stachelkugel");
+{
+  const row = (s) => s.padEnd(80, ".");
+  const rows = [];
+  for (let r = 0; r < 13; r++) rows.push(row(r === 12 ? "..........*" : ""));
+  rows.push("#".repeat(80), "#".repeat(80));
+  const st = E.buildStages(E.normalizeLibrary({ stages: [{ name: "Stacheln", theme: "meadow", cols: 80, rows,
+    enemies: [{ kind: "walker", c: 20, r: 12 }], start: [2, 12], flag: [70, 12], hut: [74, 12] }] }));
+  const run = (setup, inputs, n) => {
+    const w = E.createSoloWorld(st, 0);
+    setup(w);
+    const evs = [];
+    for (let f = 0; f < n; f++) evs.push(...E.stepWorld(w, [inputs(f, w)]));
+    return { w, evs };
+  };
+  const small = run(() => {}, () => ({ right: true }), 200);
+  ok(small.evs.some((e) => e.t === "die" && e.why === "spikes"), "kleine Figur läuft hinein: ein Leben weg");
+  const big = run((w) => { w.p.big = true; w.p.h = E.BIG_H; w.p.y -= E.BIG_H - E.SMALL_H; }, () => ({ right: true }), 200);
+  ok(big.evs.some((e) => e.t === "shrink") && !big.evs.some((e) => e.t === "die"), "große Figur schrumpft und läuft weiter (kurz unverwundbar)");
+  // von oben auf die Kugel fallen
+  const top = run((w) => { w.p.x = 10 * 16 + 2; w.p.y = 6 * 16; w.p.onGround = false; }, () => ({}), 80);
+  ok(top.evs.some((e) => e.t === "die") && !top.evs.some((e) => e.t === "stomp"), "auch von oben getroffen, zertreten geht nicht");
+  // knapp daneben: die Ecke der Kachel zählt nicht, nur das Innere der Kugel
+  const edge = run((w) => { w.p.x = 10 * 16 - 12 + E.SPIKE_IN - 1; }, () => ({}), 30);
+  ok(!edge.evs.some((e) => e.t === "die"), "die Kachelecke zählt nicht, nur die Kugel selbst");
+  // der Käfer läuft nach links und dreht an der Kugel um
+  const w = E.createSoloWorld(st, 0);
+  w.enemies[0].active = true;
+  let minX = 1e9;
+  for (let f = 0; f < 400; f++) { E.stepWorld(w, [{}]); minX = Math.min(minX, w.enemies[0].x); }
+  ok(minX >= 11 * 16 - 1 && w.enemies[0].vx > 0, "Gegner drehen an der Kugel um", { minX });
+}
+
+console.log("\n== 8. Die Fahne lässt sich nicht überspringen, niemand fällt aus dem Level");
 {
   const lib = E.normalizeLibrary(require("../public/js/levels.js")), st = E.buildStages(lib);
   // in jedem Level: mit Speed von links an die Stange fliegen, in jeder Höhe vom Boden bis weit über den Bildrand

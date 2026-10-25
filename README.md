@@ -45,12 +45,13 @@ Voraussetzung: ein kostenloses Cloudflare-Konto und dieses Repository bei GitHub
    - Jede und jeder hat **einen Versuch**. Leben gibt es unbegrenzt: Wer erwischt wird oder abstürzt, beginnt das Level von vorn, die Uhr läuft weiter.
    - Während des Laufs geht nichts übers Netz. Im Ziel wird die Zeit einmal gesendet.
 4. **Die Zeiten erscheinen live am Beamer**, sortiert nach Zeit. Unpassende Namen entfernst du mit dem **×**. **Qualifying neu starten** beginnt von vorn mit denselben Einstellungen und demselben QR-Code.
-5. **Finale einrichten**, sobald mindestens zwei im Ziel sind: Die vier Schnellsten sind vorausgewählt. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Wähle die zwei Level des Finales und ob alle im **gemeinsamen Level** laufen (siehe unten). Sobald alle Handys als verbunden angezeigt werden: **Finale starten**.
-6. **Finale:** Nach einem Countdown spielen alle gleichzeitig, jede und jeder auf dem eigenen Handy, in der eigenen Farbe (Weiß, Blau, OP-Grün, Rosa). Wer zuerst an der Fahne des zweiten Levels ist, gewinnt.
+5. **Finale einrichten**, sobald mindestens zwei im Ziel sind: Die vier Schnellsten sind vorausgewählt. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Wähle **1 Level oder 2 Level hintereinander**, die Level selbst und ob alle im **gemeinsamen Level** laufen (siehe unten). Sobald alle Handys als verbunden angezeigt werden: **Finale starten**.
+6. **Finale:** Nach einem Countdown spielen alle gleichzeitig, jede und jeder auf dem eigenen Handy, in der eigenen Farbe (Weiß, Blau, OP-Grün, Rosa). Wer zuerst an der letzten Fahne ist, gewinnt.
+   - **Nach 5 Minuten ist immer Schluss.** Bei 4:50 beginnt am Beamer und auf den Handys ein Countdown von 10 Sekunden, danach gewinnt, wer vorne liegt (erst nach Zielzeit, dann nach Strecke).
    - Der Beamer zeigt **ein großes Breitbild**, die Kamera folgt der Spitze. Über den Figuren stehen die Initialen.
    - Oben zeigt eine **Fortschrittsleiste** für alle, wie weit sie sind. Wer gerade nicht im Bild ist, bekommt einen Pfeil am Rand.
    - Das Finale endet, wenn höchstens noch einer läuft oder drei im Ziel sind. Mit **Finale jetzt beenden** gewinnt, wer gerade vorne liegt.
-7. **Siegerehrung** am Beamer: Treppchen mit den Plätzen 1 bis 3, Pokal und Namen. Danach **Revanche**, **Anderes Finale** oder **Zurück zum Qualifying**.
+7. **Siegerehrung** am Beamer: Treppchen mit den Plätzen 1 bis 3, über jeder Figur ihr Name, Pokal beim Sieger. Danach **Revanche**, **Anderes Finale** oder **Zurück zum Qualifying**.
 
 ### Gemeinsames Level oder eigene Level
 
@@ -63,11 +64,12 @@ Den Editor öffnest du auf der Lehrer-Seite oben mit **Level-Editor**. Du kannst
 
 Mitgeliefert sind fünf Level: **Auftakt** (Wiese), **Stollen** (Bergwerk), **Nachtschicht** (Klinikflur bei Nacht), **Gletscherpfad** (Eis und Schnee) und **Weinberg** (Kochertal). Alle sind auch nur gehend zu schaffen.
 
-### Speed-Item und Schleim
+### Speed-Item, Schleim und Stachelkugeln
 
 - **Speed-Item** (goldener Blitz): Wer ihn einsammelt, rennt 10 Sekunden lang, schneller und mit höheren Sprüngen. Auf dem Handy erscheint groß „Speed!“, die Figur flackert golden und zieht Nachbilder hinter sich her. Ein Balken unter den Münzen zeigt, wie lange es noch wirkt. In jedem Level liegt ein Blitz an einer Stelle, die schwer zu erreichen ist (zum Beispiel oben auf der Eisdecke oder per Lift über der Stollendecke).
 - **Schleim** (lila Pfütze am Boden): Wer hineintritt, klebt fest und wird sehr langsam, auch noch 2 Sekunden nach dem Verlassen. Springen geht normal. Jedes Level hat zwei Schleimstellen, die man überspringen oder auf einem anderen Weg umgehen kann (zum Beispiel oben über das Medikamentenregal).
-- Im gemeinsamen Level gehört der Blitz dem, der zuerst da ist. Den Schleim gibt es für alle.
+- **Stachelkugel**: Wer sie berührt, wird getroffen wie von einem Gegner: Große Figuren schrumpfen, kleine verlieren ein Leben. Zertreten lässt sie sich nicht, Gegner drehen an ihr um. Jedes Level hat zwei Kugeln, die man überspringen oder auf einem anderen Weg umgehen kann (in Stollen zum Beispiel über die Ziegelreihe).
+- Im gemeinsamen Level gehört der Blitz dem, der zuerst da ist. Schleim und Stachelkugeln gibt es für alle.
 - Die **Fahnenstange** zählt in jeder Höhe: Auch wer von einer hohen Treppe oder mit Speed über ihre Spitze springt, greift die Fahne. Am rechten Levelrand steht eine Wand, niemand fällt aus dem Level.
 
 **Tipps**
@@ -126,7 +128,7 @@ Voraussetzung: Handys und Laptop sind im selben WLAN, und das WLAN erlaubt Verbi
 **Tests**
 - `npm test`: Engine (verhält sich allein gespielt Frame für Frame wie das Einzelspiel, Abgleich mit vier Handys und Beamer) und Raum-Logik.
 - `node tools/bot.js --walk`: Ein Such-Bot prüft, ob jedes Level nur gehend zu schaffen ist. Den Lift-Abschnitt in „Stollen“ findet er allein nicht; er wurde abschnittsweise geprüft.
-- `node tools/bot.js --walk --items` prüft, ob jedes Speed-Item gehend erreichbar ist (Stollen abschnittsweise mit `node tools/stollen-item.js`), `node tools/bot.js --walk --schleim`, ob man allen Schleim vermeiden kann.
+- Der Bot weicht dabei Gegnern und Stachelkugeln aus; `node tools/bot.js --walk --items` prüft, ob jedes Speed-Item gehend erreichbar ist (Stollen abschnittsweise mit `node tools/stollen-item.js`), `node tools/bot.js --walk --schleim`, ob man allen Schleim vermeiden kann.
 - `node tests/e2e.cjs`: eine ganze Stunde im Browser mit Lehrer-Seite und vier Handys (braucht [Playwright](https://playwright.dev) mit Chromium).
 
 **Lizenzen:** Schriften Bungee, Rubik und Silkscreen unter SIL Open Font License (siehe `public/fonts/`). QR-Code-Generator von Kazuhiko Arase unter MIT-Lizenz (`public/js/qrcode.js`). Das Schullogo gehört der Karoline-Breitinger-Schule.

@@ -216,7 +216,8 @@
       <p class="eyebrow">Finale · ${esc(f.stageNames.join(" + "))}</p>
       <h2>Du bist im Finale!</h2>
       <div class="me-fig" id="meFig"></div>
-      <p>Deine Farbe: <strong class="cname c${f.slot}">${esc(COLOR_NAMES[f.slot])}</strong>. Gespielt werden zwei Level hintereinander, wer zuerst an der letzten Fahne ist, gewinnt.
+      <p>Deine Farbe: <strong class="cname c${f.slot}">${esc(COLOR_NAMES[f.slot])}</strong>. ${f.stageNames.length > 1 ? "Gespielt werden zwei Level hintereinander, wer zuerst an der letzten Fahne ist, gewinnt." : "Gespielt wird ein Level, wer zuerst an der Fahne ist, gewinnt."}
+      Nach 5 Minuten ist Schluss, dann gewinnt, wer vorne liegt.
       ${f.shared ? "Alle laufen im selben Level: Münzen, Blöcke und Gegner gelten für alle, aber niemand kann dich blockieren." : "Jede und jeder läuft im eigenen Level, die anderen siehst du als Geister."}</p>
       <ul class="flist">${others(f)}</ul>
       <p class="hint">Das Finale startet, sobald deine Lehrkraft am Beamer auf „Finale starten“ drückt. Lass die Seite offen.</p></div>`);
@@ -236,6 +237,7 @@
     screen = "final-result";
     const place = f.place.indexOf(f.slot) + 1, win = place === 1;
     setPanel(`<div class="card result">
+      ${f.timeUp ? '<p class="eyebrow">Zeit um: nach 5 Minuten gewinnt, wer vorne liegt</p>' : ""}
       <h2>${win ? "Gewonnen!" : place ? "Platz " + place : "Finale beendet"}</h2>
       <div class="me-fig" id="meFig"></div>
       <p>${f.fin[f.slot] != null ? `Deine Zeit: <strong>${P.fmt(f.fin[f.slot])}</strong>` : "Du warst noch nicht an der letzten Fahne."}</p>
@@ -302,11 +304,11 @@
 
   function startFinal(f) {
     const stages = lv.final.map((d, i) => E.stageView(E.normalizeStage(d, i)));
-    const slot = f.slot, n = f.names.length, tags = f.names.map(G.initials);
+    const slot = f.slot, n = f.names.length, tags = f.names.map(G.initials), plan = stages.map((_, i) => i);
     showGame();
     screen = "playing";
     const N = P.netRace({
-      stages, plan: [0, 1], n, shared: f.shared, local: slot, startAt: f.startAt, now: () => net.serverNow(),
+      stages, plan, n, shared: f.shared, local: slot, startAt: f.startAt, now: () => net.serverNow(),
       send: (o) => net.send(o), view,
       onEvents: (ev, m) => {
         const rec = m.recs[slot], w = E.worldFor(m, rec);
@@ -320,7 +322,7 @@
     const late = N.frameNow() > 30;
     race = { kind: "final", N, slot, round: f.round, waitLogs: late, done: null, raf: 0, finishedAt: 0 };
     if (late) N.askLogs();
-    let lastCount = 99;
+    let lastCount = 99, lastLimit = 0;
     const look = { colorOf: (s) => s, tagOf: (s) => tags[s] };
     function loop() {
       if (!race || race.N !== N) return;
@@ -333,8 +335,14 @@
       G.stepParticles(view);
       P.drawRec(view, m, rec, look);
       hTime.textContent = P.fmt(rec.fin != null ? rec.fin : Math.max(0, m.frame));
-      hInfo.innerHTML = `Finale<br><b>Etappe ${rec.k + 1}/2</b>`;
+      hInfo.innerHTML = `Finale<br><b>${plan.length > 1 ? "Etappe " + (rec.k + 1) + "/" + plan.length : esc(f.stageNames[0])}</b>`;
+      const limit = P.finalCountdown(m.frame);
+      if (limit !== lastLimit) { lastLimit = limit; if (limit > 0) A.SFX.count(); else if (limit < 0) A.SFX.fanfare(); }
       if (race.waitLogs) say("", "Verbinde …");
+      else if (limit < 0) {
+        const lead = P.standings(m)[0];
+        say("Zeit um!", lead.slot === slot ? "Du liegst vorne!" : f.names[lead.slot] + " liegt vorne", true);
+      }
       else if (fnow < 0) {
         const c = Math.ceil(-fnow / 60);
         if (c !== lastCount && c <= 3) { lastCount = c; A.SFX.count(); }
@@ -343,7 +351,8 @@
       else if (rec.fin != null) {
         if (!race.finishedAt) { race.finishedAt = performance.now(); A.SFX.finish(); }
         say("Ziel!", P.fmt(rec.fin), true);
-      } else if (P.speedNews(rec)) say("Speed!", "", true);
+      } else if (limit > 0) say(String(limit), "Noch " + limit + (limit === 1 ? " Sekunde" : " Sekunden"));
+      else if (P.speedNews(rec)) say("Speed!", "", true);
       else if (rec.down) say("", "Nochmal von vorn");
       else msgEl.innerHTML = "";
       // nach dem Ende kurz das Bild stehen lassen, dann das Ergebnis

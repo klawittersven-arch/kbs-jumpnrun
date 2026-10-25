@@ -10,7 +10,7 @@ import E from '../public/js/engine.js';
 export const MAX_PLAYERS = 60;
 export const MAX_ROUNDS = 5;
 export const MIN_FINAL = 2, MAX_FINAL = 4;
-const MAX_FINAL_FRAMES = 60 * 60 * 15; // ein Finale dauert höchstens 15 Minuten
+const MAX_FINAL_FRAMES = E.FINAL_FRAMES; // nach 5 Minuten ist Schluss (siehe engine.js)
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ' -]{0,15}$/;
 
 export function cleanName(first, initial) {
@@ -169,16 +169,16 @@ export class RoomLogic {
     }
   }
 
-  // Finale aus der Nachricht der Lehrkraft: Spieler (2–4, in Startreihenfolge = Farbe), zwei Level, gemeinsames Level ja/nein
+  // Finale aus der Nachricht der Lehrkraft: Spieler (2–4, in Startreihenfolge = Farbe), ein oder zwei Level, gemeinsames Level ja/nein
   makeFinal(s, msg) {
     const p = Array.isArray(msg.p) ? msg.p.map(String) : [];
     if (p.length < MIN_FINAL || p.length > MAX_FINAL || new Set(p).size !== p.length || !p.every(pid => s.players[pid])) return null;
     const raw = Array.isArray(msg.stages) ? msg.stages.slice(0, 2) : [];
     const stages = raw.map((st, i) => E.normalizeStage(st, i));
-    if (stages.length !== 2 || stages.some(st => !st)) return null;
+    if (stages.length < 1 || stages.some(st => !st)) return null;
     s.lv++;
     return {
-      p, names: p.map(pid => s.players[pid].name), stages, si: Array.isArray(msg.si) ? msg.si.slice(0, 2).map(v => int(v, 0, 99, 0)) : [0, 1],
+      p, names: p.map(pid => s.players[pid].name), stages, si: Array.isArray(msg.si) ? msg.si.slice(0, stages.length).map(v => int(v, 0, 99, 0)) : stages.map((_, i) => i),
       shared: !!msg.shared, lv: s.lv, state: 'ready', startAt: 0, fin: p.map(() => null), place: [], round: s.final ? s.final.round || 0 : 0, doneAt: 0,
     };
   }
@@ -226,7 +226,7 @@ export class RoomLogic {
     const stages = f.stages.map(E.stageView);
     this.race = {
       round: f.round, logs: f.p.map(() => ''), stepped: 0,
-      m: E.createMatch(stages, [0, 1], f.p.length, { shared: f.shared, regrow: f.shared }),
+      m: E.createMatch(stages, stages.map((_, i) => i), f.p.length, { shared: f.shared, regrow: f.shared }),
     };
   }
   // das laufende Rennen; nach dem Zieleinlauf werden Eingaben noch kurz weitergereicht, damit der Beamer den
@@ -258,7 +258,7 @@ export class RoomLogic {
       if (c.ws === conn.ws) continue;
       if (cm.role === 'teacher' || (cm.role === 'player' && s.final.p.includes(cm.pid))) c.sendRaw(out);
     }
-    if (s.phase === 'final' && this.advance(s)) { this.conclude(s, false); await this.persist(); this.pushAll(); }
+    if (s.phase === 'final' && this.advance(s)) { this.conclude(s, race.m.frame >= MAX_FINAL_FRAMES); await this.persist(); this.pushAll(); }
   }
   // das Rennen bis zum letzten Frame rechnen, für den alle Eingaben da sind; true, wenn jemand neu im Ziel ist
   advance(s) {
@@ -267,15 +267,18 @@ export class RoomLogic {
     let upTo = Infinity;
     for (const l of race.logs) upTo = Math.min(upTo, l.length);
     let changed = false;
+    upTo = Math.min(upTo, MAX_FINAL_FRAMES);
     while (race.m.frame < upTo) {
       const fr = race.m.frame, bits = race.logs.map(l => E.charInput(l[fr]));
       E.stepMatch(race.m, bits);
       race.m.recs.forEach((r, i) => { if (r.fin != null && f.fin[i] == null) { f.fin[i] = r.fin; changed = true; } });
     }
+    // nach 5 Minuten ist Schluss: wer dann vorne liegt, gewinnt
+    if (race.m.frame >= MAX_FINAL_FRAMES) changed = true;
     return changed;
   }
   // Platzierung: wer im Ziel ist nach Zeit, dann nach Fortschritt. Das Finale endet, wenn höchstens einer
-  // noch läuft oder drei im Ziel sind (oder die Lehrkraft es beendet).
+  // noch läuft oder drei im Ziel sind, nach 5 Minuten (force) oder wenn die Lehrkraft es beendet.
   conclude(s, force) {
     const f = s.final, n = f.p.length;
     const done = f.fin.filter(x => x != null).length;
@@ -287,6 +290,7 @@ export class RoomLogic {
       return m ? E.progressOf(m, m.recs[b]) - E.progressOf(m, m.recs[a]) || a - b : a - b;
     });
     f.place = order;
+    f.timeUp = !!m && m.frame >= MAX_FINAL_FRAMES && f.fin.filter(x => x != null).length < Math.min(3, n - 1);
     f.state = 'done'; f.doneAt = this.io.now();
     s.phase = 'podium';
   }
@@ -322,7 +326,7 @@ export class RoomLogic {
     const f = this.s.final; if (!f) return null;
     const out = {
       names: f.names, stageNames: f.stages.map(st => st.name), shared: f.shared, lv: f.lv, state: f.state,
-      startAt: f.startAt, fin: f.fin, place: f.place, round: f.round, doneAt: f.doneAt, si: f.si,
+      startAt: f.startAt, fin: f.fin, place: f.place, round: f.round, doneAt: f.doneAt, si: f.si, timeUp: !!f.timeUp,
     };
     if (withPids) { const on = this.online(); out.p = f.p; out.online = f.p.map(pid => on.has(pid)); }
     return out;

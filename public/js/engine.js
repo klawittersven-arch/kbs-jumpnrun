@@ -31,8 +31,10 @@
   const SOLID = new Set(["#", "R", "B", "b", "Q", "P", "U"]);
   // "U" (ein geleerter Block) entsteht erst beim Spielen; "~" ist Wasser, sieht aus wie ein Bach, trägt aber nicht;
   // "s" ist das Speed-Item: wer es einsammelt, rennt 10 Sekunden lang;
-  // "x" ist Schleim, eine Pfütze auf dem Boden darunter: wer hineintritt, wird sehr langsam
-  const TILE_CHARS = ".#RBbQPo~sx";
+  // "x" ist Schleim, eine Pfütze auf dem Boden darunter: wer hineintritt, wird sehr langsam;
+  // "*" ist eine Stachelkugel: wer sie berührt, wird getroffen wie von einem Gegner (auch von oben)
+  const TILE_CHARS = ".#RBbQPo~sx*";
+  const SPIKE_IN = 3; // die Kugel ist rund: getroffen wird nur, wer ihr Inneres berührt (10 × 10 px)
   const MIN_COLS = 24, MAX_COLS = 400, MAX_ENEMIES = 160, MAX_LIFTS = 40, NAME_MAX = 24, MAX_STAGES = 12;
   // Lifte fahren ewig ihre Spalte hinauf oder hinunter: wer den Bildschirm verlässt, kommt auf der anderen Seite wieder
   const LIFT_W = 3, LIFT_H = 8, LIFT_V = 1, LIFT_LOOP = VH + 32;
@@ -42,6 +44,8 @@
   const RESPAWN_AFTER = 240; // spätestens so viele Frames nach einem verlorenen Leben beginnt die Etappe neu
   const REGROW = 240; // im Finale wachsen zerschlagene Ziegel nach 4 Sekunden nach
   const SPEED_T = 600; // so viele Frames rennt die Figur nach dem Speed-Item
+  // ein Finale dauert höchstens 5 Minuten; 10 Sekunden vor Schluss beginnt ein Countdown, dann gewinnt, wer vorne liegt
+  const FINAL_FRAMES = 5 * 60 * 60, FINAL_WARN = FINAL_FRAMES - 10 * 60;
   const SLIME_AFTER = 120, SLIME_MAX = 0.5; // im Schleim und 2 Sekunden danach höchstens 0,5 px pro Frame
 
   // ---------------------------------------------------------------- Leveldaten
@@ -290,6 +294,16 @@
     p.anim += Math.abs(p.vx);
   }
 
+  function touchesSpikes(w, p) {
+    for (let c = Math.floor(p.x / T); c <= Math.floor((p.x + p.w - 0.01) / T); c++) {
+      for (let r = Math.floor(p.y / T); r <= Math.floor((p.y + p.h - 0.01) / T); r++) {
+        if (tileAt(w, c, r) !== "*") continue;
+        const x = c * T + SPIKE_IN, y = r * T + SPIKE_IN, s = T - 2 * SPIKE_IN;
+        if (p.x < x + s && p.x + p.w > x && p.y < y + s && p.y + p.h > y) return true;
+      }
+    }
+    return false;
+  }
   // steht die Figur in einer Schleimpfütze? (die Pfütze liegt im Feld über dem Boden, in Höhe der Füße)
   function onSlime(w, p) {
     const r = Math.floor((p.y + p.h - 0.01) / T);
@@ -423,7 +437,9 @@
       if (e.vx !== 0) {
         const nx = e.x + e.vx;
         const front = e.vx < 0 ? nx : nx + e.w;
-        if (nx < 0 || solidAt(w, Math.floor(front / T), Math.floor((e.y + e.h - 1) / T))) {
+        // Gegner drehen an Wänden und an Stachelkugeln um
+        if (nx < 0 || solidAt(w, Math.floor(front / T), Math.floor((e.y + e.h - 1) / T)) ||
+            tileAt(w, Math.floor(front / T), Math.floor((e.y + e.h / 2) / T)) === "*") {
           e.vx = -e.vx;
           if (e.state === "slide") ev.push({ t: "shellWall", x: e.x, y: e.y });
         } else e.x = nx;
@@ -488,6 +504,12 @@
     }
     // Gegnerkontakt zählt nur jeden zweiten Frame, wie im Original
     if (p.freeze > 0 || w.frame & 1) return;
+    // Stachelkugel: wie ein Gegner, nur lässt sie sich nicht zertreten
+    if (p.hurt <= 0 && touchesSpikes(w, p)) {
+      if (p.big) { p.freeze = 40; p.freezeKind = "shrink"; ev.push({ t: "shrink", s: p.slot }); }
+      else die(w, p, ev, "spikes");
+      return;
+    }
     for (const e of w.enemies) {
       if (!e.active || !live(e) || !overlap(p, e)) continue;
       if (e.state === "shell") {
@@ -836,7 +858,7 @@
 
   return {
     T, VW, VH, ROWS, PH, SMALL_H, BIG_H, SOLID, TILE_CHARS, MIN_COLS, MAX_COLS, MAX_ENEMIES, MAX_LIFTS, NAME_MAX, MAX_STAGES,
-    LIFT_W, LIFT_H, LIFT_V, LIFT_LOOP, THEMES, ENEMY_KINDS, STAGE_PAUSE, RESPAWN_AFTER, REGROW, SPEED_T, SLIME_AFTER, SLIME_MAX,
+    LIFT_W, LIFT_H, LIFT_V, LIFT_LOOP, THEMES, ENEMY_KINDS, STAGE_PAUSE, RESPAWN_AFTER, REGROW, SPEED_T, SLIME_AFTER, SLIME_MAX, SPIKE_IN, FINAL_FRAMES, FINAL_WARN,
     normalizeStage, normalizeLibrary, stageView, buildStages,
     makePlayer, createWorld, createSoloWorld, addPlayer, removePlayer, cloneWorld, tileAt, stepWorld,
     BIT, encodeInput, decodeInput, inputChar, charInput,

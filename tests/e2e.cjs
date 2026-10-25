@@ -159,7 +159,7 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     await shot(phones[0], "11-handy-finalergebnis");
     for (const p of phones) await p.keyboard.up("ArrowRight");
 
-    console.log("\n== Zweites Finale: nur zwei, jede im eigenen Level");
+    console.log("\n== Zweites Finale: nur zwei, jede im eigenen Level, nur ein Level");
     await teacher.click("#btnNewFinal");
     await until(() => teacher.evaluate(() => window.__teacher.screen === "final-setup"), 5000, "Finale einrichten");
     // Zoë und Jonas abwählen, gemeinsames Level aus
@@ -169,6 +169,9 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     await until(() => teacher.evaluate(() => window.__teacher.room.final.p.length === 2), 4000, "zwei gewählt");
     await teacher.click("#chkShared");
     await until(() => teacher.evaluate(() => window.__teacher.room.final.shared === false), 4000, "eigene Level");
+    await teacher.click('#fCount button[data-n="1"]');
+    await until(() => teacher.evaluate(() => window.__teacher.room.final.stageNames.length === 1), 4000, "ein Level");
+    ok(await teacher.locator("#fLv1").isHidden(), "Finale mit nur einem Level eingestellt");
     await until(() => phones[2].evaluate(() => window.__student.screen === "spectator"), 5000, "Zoë schaut zu");
     ok(true, "abgewählte Handys zeigen „Das Finale läuft am Beamer“");
     await until(() => teacher.evaluate(() => !document.querySelector("#btnStart").disabled), 5000, "Start bereit");
@@ -209,7 +212,7 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     console.log("\n== Level-Editor nur für die Lehrkraft");
     await teacher.click("#btnEditor");
     await teacher.waitForSelector("#edCanvas");
-    ok(await teacher.locator(".tool").count() === 20, "Editor mit allen Werkzeugen");
+    ok(await teacher.locator(".tool").count() === 21, "Editor mit allen Werkzeugen");
     await teacher.fill("#edName", "Mein Level");
     await teacher.dispatchEvent("#edName", "change");
     const saved = await teacher.evaluate(() => JSON.parse(localStorage.getItem("jr.levels")).stages[0].name);

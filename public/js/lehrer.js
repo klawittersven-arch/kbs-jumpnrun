@@ -25,7 +25,8 @@
   let sess = U.store("jr.teacher");
   let net = null, room = null, screen = "", race = null, podiumRound = -1;
   const setup = Object.assign({ si: 0, rounds: 1 }, U.store("jr.teacher.setup") || {});
-  const fsel = { p: null, si: [0, 1], shared: true, n: 4 };
+  // Auswahl fürs Finale; die Zahl der Level (1 oder 2) merkt sich der Browser
+  const fsel = { p: null, si: [0, 1], shared: true, n: 4, count: (U.store("jr.teacher.final") || {}).count === 1 ? 1 : 2 };
   const lv = { final: null, flv: 0, asked: 0 };
 
   // ---------------------------------------------------------------- Verbindung
@@ -221,27 +222,33 @@
   // ---------- 3. Finale einrichten
   function finishers() { return room.players.filter((p) => p.total != null).sort((a, b) => a.rank - b.rank); }
   function sendFinal(start) {
-    const msg = { t: start ? "final-start" : "final-setup", p: fsel.p, stages: fsel.si.map((i) => lib.stages[i]), si: fsel.si, shared: fsel.shared };
+    const si = fsel.si.slice(0, fsel.count);
+    const msg = { t: start ? "final-start" : "final-setup", p: fsel.p, stages: si.map((i) => lib.stages[i]), si, shared: fsel.shared };
     send(msg);
   }
   function openFinalSetup() {
     const fin = finishers();
     if (fin.length < 2) return toast("Für das Finale braucht es mindestens zwei Zeiten.");
     fsel.p = fin.slice(0, Math.min(fsel.n, fin.length)).map((p) => p.pid);
-    if (fsel.si.some((i) => i >= lib.stages.length)) fsel.si = [0, Math.min(1, lib.stages.length - 1)];
+    if (fsel.si.length < 2 || fsel.si.some((i) => i >= lib.stages.length)) fsel.si = [0, Math.min(1, lib.stages.length - 1)];
     sendFinal(false);
   }
   function renderFinalSetup() {
     screen = "final-setup";
     const f = room.final;
     fsel.p = f.p.slice(); fsel.shared = f.shared;
-    if (f.si && f.si.every((i) => i < lib.stages.length)) fsel.si = f.si.slice();
+    if (f.si && f.si.length && f.si.every((i) => i < lib.stages.length)) { fsel.si = f.si.concat(fsel.si.slice(f.si.length)); fsel.count = f.si.length; }
     viewEl.innerHTML = `<div class="tpage">
-      <div class="thead"><h2>Finale einrichten</h2><p>Die Schnellsten aus dem Qualifying sind vorausgewählt. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Die Reihenfolge im Qualifying bestimmt die Farbe.</p></div>
+      <div class="thead"><h2>Finale einrichten</h2><p>Die Schnellsten aus dem Qualifying sind vorausgewählt. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Die Reihenfolge im Qualifying bestimmt die Farbe. Nach 5 Minuten ist immer Schluss: 10 Sekunden vorher beginnt ein Countdown, dann gewinnt, wer vorne liegt.</p></div>
       <div class="tsec"><h3>Finalisten</h3><div class="finalists" id="fPlayers"></div></div>
+      <div class="tsec"><h3>Anzahl Level</h3>
+        <div class="seg-pick" role="radiogroup" aria-label="Anzahl Level" id="fCount">
+          <button type="button" role="radio" data-n="1" aria-checked="${fsel.count === 1}">1 Level</button>
+          <button type="button" role="radio" data-n="2" aria-checked="${fsel.count === 2}">2 Level hintereinander</button>
+        </div></div>
       <div class="tgrid2">
-        <div class="tsec"><h3>Etappe 1</h3><div id="fLv0"></div></div>
-        <div class="tsec"><h3>Etappe 2</h3><div id="fLv1"></div></div>
+        <div class="tsec"><h3>${fsel.count === 1 ? "Level" : "Etappe 1"}</h3><div id="fLv0"></div></div>
+        <div class="tsec" ${fsel.count === 1 ? "hidden" : ""}><h3>Etappe 2</h3><div id="fLv1"></div></div>
       </div>
       <label class="toggle"><input type="checkbox" id="chkShared"><span><b>Gemeinsames Level</b>
         <span>Alle laufen im selben Level und sehen sich gegenseitig. Niemand blockiert jemanden, aber Münzen, zerbrochene Ziegel und Gegner gelten für alle. Ziegel wachsen nach 4 Sekunden nach, Panzer treffen nur Gegner, Kristalle bekommt, wer zuerst da ist. Ohne Haken läuft jede und jeder im eigenen Level, die anderen sind als Geister zu sehen.</span></span></label>
@@ -257,6 +264,14 @@
     };
     $("#fLv0").appendChild(small(0, (j) => { fsel.si[0] = j; sendFinal(false); }));
     $("#fLv1").appendChild(small(1, (j) => { fsel.si[1] = j; sendFinal(false); }));
+    $("#fCount").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+      const n = +b.dataset.n;
+      if (n === fsel.count) return;
+      fsel.count = n;
+      U.store("jr.teacher.final", { count: n });
+      screen = "";
+      sendFinal(false);
+    }));
     const chk = $("#chkShared"); chk.checked = fsel.shared;
     chk.onchange = () => { fsel.shared = chk.checked; sendFinal(false); };
     $("#btnBackQ").onclick = () => send({ t: "phase", phase: "quali" });
@@ -310,22 +325,22 @@
     stopRace();
     screen = "final";
     const stages = lv.final.map((d, i) => E.stageView(E.normalizeStage(d, i)));
-    const n = f.names.length, tags = f.names.map(G.initials);
+    const n = f.names.length, tags = f.names.map(G.initials), plan = stages.map((_, i) => i), ns = plan.length;
     viewEl.innerHTML = `<div class="tpage race">
       <div class="progress" id="prog"></div>
       <div class="beam"><canvas id="beam" width="${BEAM_W}" height="240" aria-label="Finale, die Kamera folgt der Spitze"></canvas><div class="overlay" id="bmsg"></div></div>
       <div class="racers" id="racers">${f.names.map((nm, i) => `<div class="racer" id="r${i}"><span class="dot c${i}"></span><span><span class="nm cname c${i}">${esc(nm)}</span><small id="rs${i}"></small></span><span class="tm" id="rt${i}"></span></div>`).join("")}</div>
       <div class="racefoot"><span class="eyebrow">Finale · ${esc(f.stageNames.join(" + "))}${f.shared ? " · gemeinsames Level" : ""}</span>
         <span><button class="ghost-btn" id="btnCancel" type="button">Abbrechen</button> <button class="ghost-btn" id="btnEnd" type="button">Finale jetzt beenden</button></span></div></div>`;
-    // Fortschrittsleiste: zwei Abschnitte, ein Punkt je Spieler mit Initialen
+    // Fortschrittsleiste: ein Abschnitt je Level, ein Punkt je Spieler mit Initialen
     const prog = $("#prog");
-    prog.innerHTML = [0, 1].map((k) => `<div class="seg" style="left:calc(24px + (100% - 48px) * ${k / 2} + ${k ? 6 : 0}px);width:calc((100% - 48px) / 2 - 6px)"><span>${k + 1} · ${esc(f.stageNames[k])}</span></div>`).join("") +
+    prog.innerHTML = plan.map((k) => `<div class="seg" style="left:calc(24px + (100% - 48px) * ${k / ns} + ${k ? 6 : 0}px);width:calc((100% - 48px) / ${ns} - 6px)"><span>${ns > 1 ? k + 1 + " · " : ""}${esc(f.stageNames[k])}</span></div>`).join("") +
       `<div class="flag" style="left:calc(100% - 26px)"></div>` +
       f.names.map((nm, i) => `<div class="pdot" id="pd${i}" style="background:var(--c${i});left:24px"><b class="cname c${i}">${esc(tags[i])}</b></div>`).join("");
     const view = G.makeView($("#beam"));
     const B = P.beamer(view);
     const N = P.netRace({
-      stages, plan: [0, 1], n, shared: f.shared, local: -1, startAt: f.startAt, now: () => net.serverNow(), send: (o) => net.send(o), view,
+      stages, plan, n, shared: f.shared, local: -1, startAt: f.startAt, now: () => net.serverNow(), send: (o) => net.send(o), view,
       onEvents: (ev, m) => {
         const lead = B.leader(m), w = lead && E.worldFor(m, lead);
         for (const e of ev) {
@@ -336,7 +351,7 @@
         }
       },
     });
-    race = { N, B, round: f.round, raf: 0, done: null, n, lastCount: 99 };
+    race = { N, B, round: f.round, raf: 0, done: null, n, lastCount: 99, lastLimit: 0, autoEnd: false };
     if (N.frameNow() > 30) N.askLogs();
     const look = { colorOf: (s) => s, tagOf: (s) => tags[s] };
     const dots = f.names.map((_, i) => $("#pd" + i));
@@ -357,9 +372,18 @@
         msg.innerHTML = c <= 3 ? `<div class="big">${c}</div><div class="sub">Finale</div>` : `<div class="sub">Gleich geht's los</div>`;
       } else if (fnow < 60) { if (race.lastCount) { race.lastCount = 0; A.SFX.start(); } msg.innerHTML = `<div class="big">Los!</div>`; }
       else {
+        // Zeitlimit: 10 Sekunden Countdown, dann „Zeit um!“
+        const limit = P.finalCountdown(m.frame);
+        if (limit !== race.lastLimit) { race.lastLimit = limit; if (limit > 0) A.SFX.count(); else if (limit < 0) A.SFX.finish(); }
         const first = m.recs.filter((r) => r.fin != null).sort((a, b) => a.fin - b.fin)[0];
-        msg.innerHTML = first ? `<div class="big gold">Ziel!</div><div class="sub">${esc(f.names[first.slot])} · ${P.fmt(first.fin)}</div>` : "";
+        if (limit < 0) {
+          const lead = P.standings(m)[0];
+          msg.innerHTML = `<div class="big gold">Zeit um!</div><div class="sub">${esc(f.names[lead.slot])} liegt vorne</div>`;
+        } else if (limit > 0) msg.innerHTML = `<div class="big">${limit}</div><div class="sub">Noch ${limit} ${limit === 1 ? "Sekunde" : "Sekunden"}</div>`;
+        else msg.innerHTML = first ? `<div class="big gold">Ziel!</div><div class="sub">${esc(f.names[first.slot])} · ${P.fmt(first.fin)}</div>` : "";
       }
+      // Sicherheitsnetz: fehlen dem Server nach Ablauf der Zeit noch Eingaben (Handy weg), beendet der Beamer das Finale
+      if (!race.autoEnd && fnow > E.FINAL_FRAMES + 8 * 60 && room.phase === "final") { race.autoEnd = true; send({ t: "final-end" }); }
       if (++tick % 6 === 0) {
         // Punkte auf der Fortschrittsleiste; liegen sie dicht beieinander, stapeln sich die Initialen
         const shares = m.recs.map((r) => P.share(m, r));
@@ -375,7 +399,7 @@
           dots[i].style.left = `calc(24px + (100% - 48px) * ${sh.toFixed(4)})`;
           const stale = fnow > 60 && N.stale(i) && r.fin == null;
           $("#r" + i).classList.toggle("stale", stale);
-          $("#rs" + i).textContent = stale ? "Verbindung …" : r.fin != null ? "im Ziel" : "Etappe " + (r.k + 1) + (r.deaths ? " · " + r.deaths + "× neu" : "");
+          $("#rs" + i).textContent = stale ? "Verbindung …" : r.fin != null ? "im Ziel" : (ns > 1 ? "Etappe " + (r.k + 1) + "/" + ns : "unterwegs") + (r.deaths ? " · " + r.deaths + "× neu" : "");
           $("#rt" + i).textContent = r.fin != null ? P.fmt(r.fin) : "";
         });
       }
@@ -394,7 +418,7 @@
     const f = room.final; podiumRound = f.round;
     const pl = f.place;
     viewEl.innerHTML = `<div class="tpage podium">
-      <p class="eyebrow">Siegerehrung · Finale ${esc(f.stageNames.join(" + "))}</p>
+      <p class="eyebrow">Siegerehrung · Finale ${esc(f.stageNames.join(" + "))}${f.timeUp ? " · nach 5 Minuten entschieden" : ""}</p>
       <canvas id="podCv" width="640" height="320" role="img" aria-label="Siegertreppchen"></canvas>
       <h2 class="cname c${pl[0]}">${esc(f.names[pl[0]])}</h2>
       <div class="places">${pl.slice(0, 3).map((s, i) => `<span>${i + 1}. <b class="cname c${s}">${esc(f.names[s])}</b>${f.fin[s] != null ? " · " + P.fmt(f.fin[s]) : ""}</span>`).join("")}</div>
@@ -405,7 +429,7 @@
       </div></div>`;
     podiumScene($("#podCv"), f);
     A.ensure(); A.SFX.fanfare();
-    $("#btnRematch").onclick = () => { fsel.p = f.p.slice(); fsel.si = f.si.slice(); fsel.shared = f.shared; sendFinal(false); };
+    $("#btnRematch").onclick = () => { fsel.p = f.p.slice(); fsel.si = f.si.concat(fsel.si.slice(f.si.length)); fsel.count = f.si.length; fsel.shared = f.shared; sendFinal(false); };
     $("#btnNewFinal").onclick = openFinalSetup;
     $("#btnBackQ2").onclick = () => send({ t: "phase", phase: "quali" });
   }
@@ -445,6 +469,15 @@
         if (!reduce && st.place === 0) { const ph = t % 1.4; if (ph < 0.35) hop = -Math.round(Math.sin((Math.PI * ph) / 0.35) * 14); }
         g.drawImage(img, Math.round(st.x + st.w / 2 - (img.width * sc) / 2), Math.round(top - G.NURSE_GROUND.big * sc + hop), img.width * sc, img.height * sc);
         if (st.place === 0) trophy(g, st.x + st.w - 30, top - 52, 3);
+        // Name über der Figur, in der Spielerfarbe mit dunklem Rand
+        const name = f.names[slot], headTop = top - (G.NURSE_GROUND.big - 3) * sc;
+        let size = 24;
+        g.font = "700 " + size + "px Rubik, system-ui, sans-serif";
+        while (size > 13 && g.measureText(name).width > st.w + 26) { size--; g.font = "700 " + size + "px Rubik, system-ui, sans-serif"; }
+        g.textAlign = "center"; g.lineJoin = "round"; g.lineWidth = 5; g.strokeStyle = "#0d0e12";
+        const ny = Math.round(headTop - 12 + (st.place === 0 ? -14 : 0));
+        g.strokeText(name, st.x + st.w / 2, ny);
+        g.fillStyle = G.COLORS[slot].ui; g.fillText(name, st.x + st.w / 2, ny);
       }
       for (const c of conf) {
         const y = ((c.y + c.v * t) % (H + 10)) - 10, x = Math.round(c.x + Math.sin(t * 2 + c.ph) * 5);

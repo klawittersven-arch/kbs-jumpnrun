@@ -118,7 +118,8 @@
     // eigene Eingaben bis zum aktuellen Frame eintragen; ruckelt das Handy, gelten die gehaltenen Tasten
     // für alle verpassten Frames (ein neuer Sprung zählt nur einmal)
     N.pump = () => {
-      const target = N.frameNow();
+      // nach 5 Minuten bleibt das Rennen stehen (siehe E.FINAL_FRAMES)
+      const target = Math.min(N.frameNow(), E.FINAL_FRAMES);
       if (opts.local >= 0) {
         if (target <= 0) { I.sample(); return; }
         const have = S.known(opts.local);
@@ -129,7 +130,7 @@
         N.flush(false);
       } else {
         // der Beamer zeigt das Rennen knapp hinter der Echtzeit und schätzt höchstens 2,5 Sekunden voraus
-        S.advanceTo(Math.max(S.match().frame, Math.min(target - BEAMER_DELAY, S.confirmed() + MAX_AHEAD)));
+        S.advanceTo(Math.max(S.match().frame, Math.min(N.frameNow() - BEAMER_DELAY, S.confirmed() + MAX_AHEAD, E.FINAL_FRAMES)));
       }
     };
     // eigene Eingaben an den Server, in kleinen Paketen
@@ -222,8 +223,22 @@
     return B;
   }
 
+  // Zeitlimit im Finale: Sekunden bis zum Schluss, sobald der Countdown läuft (sonst 0); -1 heißt „Zeit um“
+  function finalCountdown(frame) {
+    if (frame >= E.FINAL_FRAMES) return -1;
+    if (frame >= E.FINAL_WARN) return Math.ceil((E.FINAL_FRAMES - frame) / 60);
+    return 0;
+  }
+  // Rangfolge im Rennen: wer im Ziel ist nach Zeit, dann nach Fortschritt (wie auf dem Server)
+  function standings(m) {
+    return m.recs.slice().sort((a, b) => {
+      if (a.fin != null || b.fin != null) return a.fin == null ? 1 : b.fin == null ? -1 : a.fin - b.fin || a.slot - b.slot;
+      return E.progressOf(m, b) - E.progressOf(m, a) || a.slot - b.slot;
+    });
+  }
+
   // gerade das Speed-Item eingesammelt? Dann steht anderthalb Sekunden lang „Speed!“ groß im Bild
   const speedNews = (rec) => !!rec && !!rec.p && rec.p.speedT > E.SPEED_T - 90;
 
-  window.JRP = { fmt, share, drawRec, localRace, netRace, beamer, speedNews, FRAME_MS };
+  window.JRP = { fmt, share, drawRec, localRace, netRace, beamer, speedNews, finalCountdown, standings, FRAME_MS };
 })();

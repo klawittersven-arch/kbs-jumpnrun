@@ -125,6 +125,25 @@ for (let s = 0; s < 2; s++) await say(order[s], { t: 'in', f: 0, d: logs[s].slic
 await say(teacher, { t: 'logs?' });
 ok(last(teacher, 'logs').logs[1] === logs[1].slice(0, 400), 'danach hat der Raum die Protokolle wieder vollständig');
 
+console.log('\n== Finale mit nur einem Level und Zeitlimit');
+await say(teacher, { t: 'final-setup', p: order.slice(0, 2).map((c) => c.pid), stages: [tiny('Solo')], shared: false });
+ok(last(teacher, 'room').final.stageNames.join() === 'Solo', 'ein Finale mit nur einem Level lässt sich einrichten');
+await say(teacher, { t: 'final-start' });
+// niemand erreicht die Fahne: Platz 0 bleibt stehen, Platz 1 geht ein Stück und bleibt dann stehen
+const still = E.inputChar(0).repeat(E.FINAL_FRAMES + 600);
+const walker = (E.inputChar(2).repeat(50) + E.inputChar(0).repeat(E.FINAL_FRAMES + 600)).slice(0, E.FINAL_FRAMES + 600);
+let endedEarly = null;
+for (let f = 0; f < E.FINAL_FRAMES + 600 && room.s.phase === 'final'; f += 600) {
+  await say(order[0], { t: 'in', f, d: still.slice(f, f + 600) });
+  await say(order[1], { t: 'in', f, d: walker.slice(f, f + 600) });
+  if (f + 600 < E.FINAL_FRAMES && room.s.phase !== 'final' && endedEarly == null) endedEarly = f;
+}
+const tl = last(teacher, 'room');
+ok(endedEarly == null, 'vor Ablauf der 5 Minuten läuft das Finale weiter', endedEarly);
+ok(tl.phase === 'podium' && tl.final.timeUp && tl.final.place.join() === '1,0', 'nach 5 Minuten gewinnt, wer vorne liegt', tl.final);
+await say(teacher, { t: 'logs?' });
+ok(last(teacher, 'logs').logs[0].length <= E.FINAL_FRAMES, 'nach 5 Minuten nimmt der Raum keine Eingaben mehr an');
+
 console.log('\n== Finale beenden und Sitzung löschen');
 await say(teacher, { t: 'final-setup', p: order.slice(0, 2).map((c) => c.pid), stages: [tiny('Eins'), tiny('Zwei')], shared: false });
 await say(teacher, { t: 'final-start' });

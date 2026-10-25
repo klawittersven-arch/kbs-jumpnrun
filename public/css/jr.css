@@ -162,6 +162,7 @@ body.teacher{font-size:17px}
 .toggle input{width:22px;height:22px;margin-top:2px;accent-color:var(--led);flex:none}
 .toggle b{display:block}
 .toggle span{color:var(--muted);font-size:.95em}
+.tsec>.seg-pick{justify-self:start}
 .tgrid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
 
 /* Qualifying: QR-Code links, Zeiten rechts */
