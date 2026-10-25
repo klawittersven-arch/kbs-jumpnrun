@@ -39,14 +39,17 @@ Voraussetzung: ein kostenloses Cloudflare-Konto und dieses Repository bei GitHub
 ## Ablauf im Unterricht
 
 1. **Lehrer-Link am Laptop öffnen**, Beamer und Lautsprecher an. Oben rechts steht der Code der Sitzung.
-2. **Qualifying einrichten:** ein Level wählen und die Rundenzahl (1 bis 5, Standard 1). Bei mehr Runden muss das Level mehrmals hintereinander geschafft werden. Dann **Qualifying starten und QR-Code zeigen**.
+2. **Qualifying einrichten:** ein Level wählen, die Rundenzahl (1 bis 5, Standard 1) und die **Schwierigkeit**. Bei mehr Runden muss das Level mehrmals hintereinander geschafft werden.
+   - **Einfach** (Standard): das Level ohne Gegner (Käfer und Schnecken), ohne Stachelkugeln und ohne Schleim. Speed-Items, Kristalle, Lücken und Lifte bleiben.
+   - **Schwer**: das Level, wie es gebaut ist.
+   - Der Browser merkt sich die Wahl, fürs Qualifying und fürs Finale getrennt. Dann **Qualifying starten und QR-Code zeigen**.
 3. **Die SuS scannen den QR-Code**, geben Vornamen und den ersten Buchstaben des Nachnamens ein (z. B. „Lena K.“) und tippen auf **Start**. Nach einem Countdown läuft das Level auf dem Handy.
    - Im Klassenmodus wird **nur gegangen**, auch am Laptop. Gesteuert wird mit dem Steuerkreuz und „Springen“; länger drücken springt höher.
    - Jede und jeder hat **einen Versuch**. Leben gibt es unbegrenzt: Wer erwischt wird oder abstürzt, beginnt das Level von vorn, die Uhr läuft weiter.
    - **Höchstens 2 Minuten pro Person**, gezählt ab dem eigenen Start. Bei 1:50 beginnt auf dem Handy ein Countdown von 10 Sekunden, danach heißt es „Zeit um!“. Wer dann nicht im Ziel ist, bekommt als Ergebnis die geschaffte Strecke in Prozent: die weiteste Stelle, die er in den 2 Minuten erreicht hat (über alle Runden gerechnet).
    - Während des Laufs geht nichts übers Netz. Im Ziel (oder wenn die Zeit um ist) wird das Ergebnis einmal gesendet.
 4. **Die Zeiten erscheinen live am Beamer**: erst alle im Ziel nach Zeit, dahinter alle mit „Zeit um“ nach geschaffter Strecke. Unpassende Namen entfernst du mit dem **×**. **Qualifying neu starten** beginnt von vorn mit denselben Einstellungen und demselben QR-Code.
-5. **Finale einrichten**, sobald mindestens zwei fertig sind (im Ziel oder nach 2 Minuten): Die vier Besten sind vorausgewählt. Sind weniger als vier im Ziel, rücken automatisch die nach, die dem Ziel am nächsten gekommen sind. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Wähle **1 Level oder 2 Level hintereinander**, die Level selbst und ob alle im **gemeinsamen Level** laufen (siehe unten). Sobald alle Handys als verbunden angezeigt werden: **Finale starten**.
+5. **Finale einrichten**, sobald mindestens zwei fertig sind (im Ziel oder nach 2 Minuten): Die vier Besten sind vorausgewählt. Sind weniger als vier im Ziel, rücken automatisch die nach, die dem Ziel am nächsten gekommen sind. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Wähle **1 Level oder 2 Level hintereinander**, die Level selbst, die **Schwierigkeit** (einfach oder schwer, wie beim Qualifying) und ob alle im **gemeinsamen Level** laufen (siehe unten). Sobald alle Handys als verbunden angezeigt werden: **Finale starten**.
 6. **Finale:** Nach einem Countdown spielen alle gleichzeitig, jede und jeder auf dem eigenen Handy, in der eigenen Farbe (Weiß, Blau, OP-Grün, Rosa). Wer zuerst an der letzten Fahne ist, gewinnt.
    - **Nach 2 Minuten ist immer Schluss**, wie im Qualifying. Bei 1:50 beginnt am Beamer und auf den Handys ein Countdown von 10 Sekunden, danach heißt es „Zeit um!“. Es gewinnt, wer im Ziel ist (nach Zielzeit), sonst wer dem Ziel am nächsten gekommen ist: Gewertet wird die weiteste Stelle, die jemand in den 2 Minuten erreicht hat. Wer kurz vor Schluss noch abstürzt, verliert dadurch also nichts.
    - Am Beamer steht neben jedem Namen die geschaffte Strecke in Prozent, im Ziel die Zielzeit.

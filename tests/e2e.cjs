@@ -72,6 +72,7 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     await until(() => teacher.evaluate(() => window.__teacher.room && window.__teacher.room.phase === "setup"), 8000, "Raum");
     ok(await teacher.locator(".lvl").count() === 3, "die Level aus dem Lehrer-Browser stehen zur Wahl");
     await teacher.locator(".stepper button").nth(1).click(); // 2 Runden
+    ok(await teacher.locator('#qDiff button[data-easy="1"][aria-checked="true"]').count() === 1, "Schwierigkeit zur Wahl, „Einfach“ ist vorausgewählt");
     await teacher.click("#btnOpen");
     await until(() => teacher.evaluate(() => window.__teacher.screen === "quali"), 5000, "Qualifying");
     const code = await teacher.evaluate(() => window.__teacher.room.code);
@@ -140,6 +141,8 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     const fs0 = await teacher.evaluate(() => window.__teacher.room.final);
     ok(fs0.p.length === 4 && fs0.shared === true, "vier Finalisten vorausgewählt, gemeinsames Level an");
     ok(fs0.names[3] === "Jonas B.", "Jonas ist über seine Strecke ins Finale gekommen", fs0.names);
+    const qEasy = await teacher.evaluate(() => window.__teacher.room.quali.easy);
+    ok(qEasy === true && fs0.easy === true, "Qualifying und Finale laufen „einfach“");
     await until(() => teacher.evaluate(() => !document.querySelector("#btnStart").disabled), 5000, "Start bereit");
     await shot(teacher, "6-beamer-finale-einrichten");
     await until(() => phones[1].evaluate(() => window.__student.screen === "invite"), 5000, "Einladung");
@@ -152,6 +155,7 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     const stopJump2 = jumping(phones);
     await sleep(3000);
     await shot(teacher, "8-beamer-finale");
+    ok(await teacher.evaluate(() => window.__teacher.race.N.match().worlds.every((e) => e.w.enemies.length === 0)), "einfach: im Finale gibt es keine Gegner");
     await shot(phones[2], "9-handy-finale");
     await until(() => teacher.evaluate(() => window.__teacher.room.phase === "podium"), 60000, "Finale entschieden");
     stopJump2();
@@ -185,6 +189,8 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     await until(() => teacher.evaluate(() => window.__teacher.room.final.shared === false), 4000, "eigene Level");
     await teacher.click('#fCount button[data-n="1"]');
     await until(() => teacher.evaluate(() => window.__teacher.room.final.stageNames.length === 1), 4000, "ein Level");
+    await teacher.click('#fDiff button[data-easy="0"]');
+    await until(() => teacher.evaluate(() => window.__teacher.room.final.easy === false), 4000, "schwer");
     ok(await teacher.locator("#fLv1").isHidden(), "Finale mit nur einem Level eingestellt");
     await until(() => phones[2].evaluate(() => window.__student.screen === "spectator"), 5000, "Zoë schaut zu");
     ok(true, "abgewählte Handys zeigen „Das Finale läuft am Beamer“");
@@ -197,6 +203,7 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     let stopJump3 = jumping([phones[0]]);
     await sleep(2500);
     await shot(teacher, "13-beamer-geister");
+    ok(await teacher.evaluate(() => window.__teacher.race.N.match().worlds.every((e) => e.w.enemies.length > 0)), "schwer: die Gegner sind da");
     await shot(phones[1], "14-handy-geister");
     // Mehmet lädt mitten im Finale die Seite neu: das Handy holt den Stand vom Server und spielt weiter
     await phones[1].reload();

@@ -24,9 +24,27 @@
 
   let sess = U.store("jr.teacher");
   let net = null, room = null, screen = "", race = null, podiumRound = -1;
-  const setup = Object.assign({ si: 0, rounds: 1 }, U.store("jr.teacher.setup") || {});
-  // Auswahl fürs Finale; die Zahl der Level (1 oder 2) merkt sich der Browser
-  const fsel = { p: null, si: [0, 1], shared: true, n: 4, count: (U.store("jr.teacher.final") || {}).count === 1 ? 1 : 2 };
+  const setup = Object.assign({ si: 0, rounds: 1, easy: true }, U.store("jr.teacher.setup") || {});
+  // Auswahl fürs Finale; die Zahl der Level (1 oder 2) und die Schwierigkeit merkt sich der Browser
+  const fstore = U.store("jr.teacher.final") || {};
+  const fsel = { p: null, si: [0, 1], shared: true, n: 4, count: fstore.count === 1 ? 1 : 2, easy: fstore.easy !== false };
+  const saveFinalPrefs = () => U.store("jr.teacher.final", { count: fsel.count, easy: fsel.easy });
+
+  // Schwierigkeit (Standard: einfach): „einfach“ ohne Gegner, Stachelkugeln und Schleim; „schwer“ sind die Level, wie sie gebaut sind
+  const diffTxt = (easy) => (easy ? "einfach" : "schwer");
+  function diffPicker(id, easy) {
+    return `<div class="seg-pick" role="radiogroup" aria-label="Schwierigkeit" id="${id}">
+      <button type="button" role="radio" data-easy="1" aria-checked="${easy}">Einfach</button>
+      <button type="button" role="radio" data-easy="0" aria-checked="${!easy}">Schwer</button></div>
+      <p class="hint"><b>Einfach:</b> alle Level ohne Gegner (Käfer und Schnecken), ohne Stachelkugeln und ohne Schleim. <b>Schwer:</b> die Level, wie sie gebaut sind.</p>`;
+  }
+  function wireDiff(id, onPick) {
+    const box = $("#" + id);
+    box.querySelectorAll("button").forEach((b) => (b.onclick = () => {
+      box.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+      onPick(b.dataset.easy === "1");
+    }));
+  }
   const lv = { final: null, flv: 0, asked: 0 };
 
   // ---------------------------------------------------------------- Verbindung
@@ -135,6 +153,7 @@
         Jede und jeder hat höchstens 2 Minuten Spielzeit, die letzten 10 Sekunden zählt ein Countdown. Wer dann nicht im Ziel ist, wird nach der geschafften Strecke eingeordnet, hinter allen im Ziel.</p></div>
       <div class="tsec"><h3>Level</h3><div id="slotLevels"></div></div>
       <div class="tsec"><h3>Rundenzahl</h3><div id="slotRounds"></div><p class="hint">Bei mehr als einer Runde muss das Level mehrmals hintereinander geschafft werden.</p></div>
+      <div class="tsec"><h3>Schwierigkeit</h3>${diffPicker("qDiff", setup.easy)}</div>
       <div class="tactions">
         <label class="check" id="resetRow" hidden><input type="checkbox" id="chkReset" checked> Bisherige Anmeldungen und Zeiten löschen (<span id="nPlayers">0</span>)</label>
         <button class="big-btn" id="btnOpen" type="button">Qualifying starten und QR-Code zeigen</button>
@@ -142,11 +161,12 @@
     if (setup.si >= lib.stages.length) setup.si = 0;
     $("#slotLevels").appendChild(levelPicker(setup.si, (i) => { setup.si = i; saveSetup(); }, "Level fürs Qualifying"));
     $("#slotRounds").appendChild(stepper(setup.rounds, 1, 5, roundsTxt, (v) => { setup.rounds = v; saveSetup(); }));
+    wireDiff("qDiff", (easy) => { setup.easy = easy; saveSetup(); });
     updateSetupCount();
     $("#btnOpen").onclick = () => {
       A.ensure();
       const reset = room.players.length ? $("#chkReset").checked : true;
-      send({ t: "quali-open", stage: lib.stages[setup.si], si: setup.si, rounds: setup.rounds, reset });
+      send({ t: "quali-open", stage: lib.stages[setup.si], si: setup.si, rounds: setup.rounds, easy: setup.easy, reset });
     };
   }
   function saveSetup() { U.store("jr.teacher.setup", setup); }
@@ -171,7 +191,7 @@
     const q = room.quali;
     viewEl.innerHTML = `<div class="tpage quali">
       <div class="joinbox">
-        <p class="eyebrow">Qualifying · ${esc(q.name)} · ${roundsTxt(q.rounds)} · höchstens 2 Minuten</p>
+        <p class="eyebrow">Qualifying · ${esc(q.name)} · ${roundsTxt(q.rounds)} · ${diffTxt(q.easy)} · höchstens 2 Minuten</p>
         <h2>Scanne den Code und lauf deine Bestzeit</h2>
         <canvas id="qr" class="qr" role="img" aria-label="QR-Code zum Mitspielen"></canvas>
         <p class="joinurl">Ohne Kamera: <b>${esc(location.host)}/mitspielen</b> öffnen und den Code <b class="code">${esc(room.code)}</b> eingeben.</p>
@@ -189,7 +209,7 @@
     $("#btnSettings").onclick = () => send({ t: "phase", phase: "setup" });
     $("#btnRestart").onclick = () => {
       const n = room.players.length;
-      const go = () => { A.ensure(); send({ t: "quali-open", stage: lib.stages[q.si] || lib.stages[0], si: q.si, rounds: q.rounds, reset: true }); screen = ""; };
+      const go = () => { A.ensure(); send({ t: "quali-open", stage: lib.stages[q.si] || lib.stages[0], si: q.si, rounds: q.rounds, easy: !!q.easy, reset: true }); screen = ""; };
       if (!n) return go();
       confirmToast(`Neues Qualifying mit denselben Einstellungen starten? ${n === 1 ? "Die eine Anmeldung wird" : "Die " + n + " Anmeldungen und Zeiten werden"} gelöscht.`, "Neu starten", go);
     };
@@ -228,7 +248,7 @@
   function finishers() { return room.players.filter(hasResult).sort((a, b) => a.rank - b.rank); }
   function sendFinal(start) {
     const si = fsel.si.slice(0, fsel.count);
-    const msg = { t: start ? "final-start" : "final-setup", p: fsel.p, stages: si.map((i) => lib.stages[i]), si, shared: fsel.shared };
+    const msg = { t: start ? "final-start" : "final-setup", p: fsel.p, stages: si.map((i) => lib.stages[i]), si, shared: fsel.shared, easy: fsel.easy };
     send(msg);
   }
   function openFinalSetup() {
@@ -241,7 +261,7 @@
   function renderFinalSetup() {
     screen = "final-setup";
     const f = room.final;
-    fsel.p = f.p.slice(); fsel.shared = f.shared;
+    fsel.p = f.p.slice(); fsel.shared = f.shared; fsel.easy = !!f.easy;
     if (f.si && f.si.length && f.si.every((i) => i < lib.stages.length)) { fsel.si = f.si.concat(fsel.si.slice(f.si.length)); fsel.count = f.si.length; }
     viewEl.innerHTML = `<div class="tpage">
       <div class="thead"><h2>Finale einrichten</h2><p>Die Besten aus dem Qualifying sind vorausgewählt: erst alle im Ziel nach Zeit, dann alle, deren 2 Minuten um waren, nach der geschafften Strecke. Tippe Namen an, um sie hinzuzufügen oder zu entfernen (2 bis 4). Die Reihenfolge im Qualifying bestimmt die Farbe. Nach 2 Minuten ist immer Schluss: 10 Sekunden vorher beginnt ein Countdown, dann gewinnt, wer dem Ziel am nächsten gekommen ist.</p></div>
@@ -255,6 +275,7 @@
         <div class="tsec"><h3>${fsel.count === 1 ? "Level" : "Etappe 1"}</h3><div id="fLv0"></div></div>
         <div class="tsec" ${fsel.count === 1 ? "hidden" : ""}><h3>Etappe 2</h3><div id="fLv1"></div></div>
       </div>
+      <div class="tsec"><h3>Schwierigkeit</h3>${diffPicker("fDiff", fsel.easy)}</div>
       <label class="toggle"><input type="checkbox" id="chkShared"><span><b>Gemeinsames Level</b>
         <span>Alle laufen im selben Level und sehen sich gegenseitig. Niemand blockiert jemanden, aber Münzen, zerbrochene Ziegel und Gegner gelten für alle. Ziegel wachsen nach 4 Sekunden nach, Panzer treffen nur Gegner, Kristalle bekommt, wer zuerst da ist. Ohne Haken läuft jede und jeder im eigenen Level, die anderen sind als Geister zu sehen.</span></span></label>
       <div class="tactions">
@@ -273,10 +294,11 @@
       const n = +b.dataset.n;
       if (n === fsel.count) return;
       fsel.count = n;
-      U.store("jr.teacher.final", { count: n });
+      saveFinalPrefs();
       screen = "";
       sendFinal(false);
     }));
+    wireDiff("fDiff", (easy) => { fsel.easy = easy; saveFinalPrefs(); sendFinal(false); });
     const chk = $("#chkShared"); chk.checked = fsel.shared;
     chk.onchange = () => { fsel.shared = chk.checked; sendFinal(false); };
     $("#btnBackQ").onclick = () => send({ t: "phase", phase: "quali" });
@@ -335,7 +357,7 @@
       <div class="progress" id="prog"></div>
       <div class="beam"><canvas id="beam" width="${BEAM_W}" height="240" aria-label="Finale, die Kamera folgt der Spitze"></canvas><div class="overlay" id="bmsg"></div></div>
       <div class="racers" id="racers">${f.names.map((nm, i) => `<div class="racer" id="r${i}"><span class="dot c${i}"></span><span><span class="nm cname c${i}">${esc(nm)}</span><small id="rs${i}"></small></span><span class="tm" id="rt${i}"></span></div>`).join("")}</div>
-      <div class="racefoot"><span class="eyebrow">Finale · ${esc(f.stageNames.join(" + "))}${f.shared ? " · gemeinsames Level" : ""}</span>
+      <div class="racefoot"><span class="eyebrow">Finale · ${esc(f.stageNames.join(" + "))} · ${diffTxt(f.easy)}${f.shared ? " · gemeinsames Level" : ""}</span>
         <span><button class="ghost-btn" id="btnCancel" type="button">Abbrechen</button> <button class="ghost-btn" id="btnEnd" type="button">Finale jetzt beenden</button></span></div></div>`;
     // Fortschrittsleiste: ein Abschnitt je Level, ein Punkt je Spieler mit Initialen
     const prog = $("#prog");
@@ -426,7 +448,7 @@
     const f = room.final; podiumRound = f.round;
     const pl = f.place;
     viewEl.innerHTML = `<div class="tpage podium">
-      <p class="eyebrow">Siegerehrung · Finale ${esc(f.stageNames.join(" + "))}${f.timeUp ? " · nach 2 Minuten entschieden" : ""}</p>
+      <p class="eyebrow">Siegerehrung · Finale ${esc(f.stageNames.join(" + "))} · ${diffTxt(f.easy)}${f.timeUp ? " · nach 2 Minuten entschieden" : ""}</p>
       <canvas id="podCv" width="640" height="320" role="img" aria-label="Siegertreppchen"></canvas>
       <h2 class="cname c${pl[0]}">${esc(f.names[pl[0]])}</h2>
       <div class="places">${pl.slice(0, 3).map((s, i) => `<span>${i + 1}. <b class="cname c${s}">${esc(f.names[s])}</b>${f.fin[s] != null ? " · " + P.fmt(f.fin[s]) : f.prog ? " · " + P.pctHtml(f.prog[s]) : ""}</span>`).join("")}</div>
@@ -437,7 +459,7 @@
       </div></div>`;
     podiumScene($("#podCv"), f);
     A.ensure(); A.SFX.fanfare();
-    $("#btnRematch").onclick = () => { fsel.p = f.p.slice(); fsel.si = f.si.concat(fsel.si.slice(f.si.length)); fsel.count = f.si.length; fsel.shared = f.shared; sendFinal(false); };
+    $("#btnRematch").onclick = () => { fsel.p = f.p.slice(); fsel.si = f.si.concat(fsel.si.slice(f.si.length)); fsel.count = f.si.length; fsel.shared = f.shared; fsel.easy = !!f.easy; sendFinal(false); };
     $("#btnNewFinal").onclick = openFinalSetup;
     $("#btnBackQ2").onclick = () => send({ t: "phase", phase: "quali" });
   }

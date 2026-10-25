@@ -318,5 +318,15 @@ console.log("\n== 9. Zeitlimit: es zählt, wer dem Ziel am nächsten gekommen is
   ok(done.recs[0].fin != null && done.recs[0].best === 1 && E.scoreOf(done, done.recs[0]) > 1e6, "im Ziel: Strecke 1, Wertung vor allen ohne Ziel");
 }
 
+console.log("\n== 10. Schwierigkeit „einfach“");
+{
+  const lib = E.normalizeLibrary(require("../public/js/levels.js"));
+  const easy = lib.stages.map(E.easyStage);
+  ok(easy.every((s) => s.enemies.length === 0 && !s.rows.some((r) => /[x*]/.test(r))), "alle Standard-Level ohne Gegner, Stachelkugeln und Schleim");
+  const same = easy.every((s, i) => s.rows.every((r, ri) => [...r].every((ch, c) => { const o = lib.stages[i].rows[ri][c]; return o === "x" || o === "*" ? ch === "." : ch === o; })));
+  ok(same && easy.every((s, i) => s.name === lib.stages[i].name && JSON.stringify(s.flag) === JSON.stringify(lib.stages[i].flag)), "sonst ist alles wie im schweren Level");
+  ok(lib.stages.some((s) => s.enemies.length) && lib.stages.some((s) => s.rows.some((r) => r.includes("x"))), "das schwere Level bleibt dabei unverändert");
+}
+
 console.log(`\n${checks - fails} von ${checks} Prüfungen bestanden.`);
 process.exit(fails ? 1 : 0);

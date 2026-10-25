@@ -122,6 +122,9 @@
   function setPanel(html) { panel.innerHTML = html; panel.hidden = false; gameEl.hidden = true; }
   function figure(color, size) { const c = G.portrait(color || 0, false); const cv = document.createElement("canvas"); cv.width = c.width; cv.height = c.height; cv.getContext("2d").drawImage(c, 0, 0); if (size) cv.style.width = size; return cv; }
   const roundsTxt = (n) => n + " " + (n === 1 ? "Runde" : "Runden");
+  // „einfach“: ohne Gegner, Stachelkugeln und Schleim; „schwer“: die Level, wie sie gebaut sind
+  const diffTxt = (easy) => (easy ? "einfach" : "schwer");
+  const diffLong = (easy) => (easy ? "einfach, ohne Gegner, Stachelkugeln und Schleim" : "schwer");
   const LIMIT_MIN = Math.round(E.QUALI_FRAMES / 3600), LIMIT_TXT = "höchstens " + LIMIT_MIN + " Minuten";
 
   function renderCodeEntry(err) {
@@ -161,7 +164,7 @@
     const q = you.quali;
     setPanel(`<form class="card" id="nameForm" novalidate>
       <h2>Qualifying</h2>
-      <p><strong>${esc(q.name)}</strong> · ${roundsTxt(q.rounds)}. Du spielst allein gegen die Uhr, deine Zeit erscheint am Beamer. Du hast einen Versuch und ${LIMIT_TXT}.</p>
+      <p><strong>${esc(q.name)}</strong> · ${roundsTxt(q.rounds)} · ${diffLong(q.easy)}. Du spielst allein gegen die Uhr, deine Zeit erscheint am Beamer. Du hast einen Versuch und ${LIMIT_TXT}.</p>
       <div class="row">
         <div class="field grow"><label for="inFirst">Vorname</label><input id="inFirst" autocomplete="given-name" maxlength="16" value="${esc(form.first)}" required></div>
         <div class="field initial"><label for="inInit">Nachname</label><input id="inInit" maxlength="1" autocapitalize="characters" autocomplete="off" value="${esc(form.initial)}" placeholder="K" required></div>
@@ -189,7 +192,7 @@
     screen = "ready";
     const q = you.quali, touch = document.body.classList.contains("touch");
     setPanel(`<div class="card">
-      <p class="eyebrow">Qualifying · ${esc(q.name)} · ${roundsTxt(q.rounds)}</p>
+      <p class="eyebrow">Qualifying · ${esc(q.name)} · ${roundsTxt(q.rounds)} · ${diffTxt(q.easy)}</p>
       <h2>Bereit, ${esc(you.me.name)}?</h2>
       <p>${q.rounds > 1 ? `Du läufst das Level ${q.rounds}-mal hintereinander. ` : ""}Die Uhr startet nach dem Countdown und stoppt an der letzten Fahne. Wer erwischt wird oder abstürzt, beginnt das Level von vorn, die Uhr läuft weiter.</p>
       <p>Du hast ${LIMIT_TXT}. Bist du dann noch nicht im Ziel, zählt, wie weit du gekommen bist.</p>
@@ -223,7 +226,7 @@
   function renderInvite(f) {
     screen = "invite";
     setPanel(`<div class="card">
-      <p class="eyebrow">Finale · ${esc(f.stageNames.join(" + "))}</p>
+      <p class="eyebrow">Finale · ${esc(f.stageNames.join(" + "))} · ${diffTxt(f.easy)}</p>
       <h2>Du bist im Finale!</h2>
       <div class="me-fig" id="meFig"></div>
       <p>Deine Farbe: <strong class="cname c${f.slot}">${esc(COLOR_NAMES[f.slot])}</strong>. ${f.stageNames.length > 1 ? "Gespielt werden zwei Level hintereinander, wer zuerst an der letzten Fahne ist, gewinnt." : "Gespielt wird ein Level, wer zuerst an der Fahne ist, gewinnt."}

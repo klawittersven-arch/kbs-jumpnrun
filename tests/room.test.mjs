@@ -171,6 +171,25 @@ ok(tl.final.prog[0] > tl.final.prog[1] && tl.final.prog[0] < 1, 'die geschaffte 
 await say(teacher, { t: 'logs?' });
 ok(last(teacher, 'logs').logs[0].length <= E.FINAL_FRAMES, 'nach 2 Minuten nimmt der Raum keine Eingaben mehr an');
 
+console.log('\n== Schwierigkeit einfach oder schwer');
+const hard = tiny('Hart');
+hard.rows[12] = row('....xx..*');
+hard.enemies = [{ kind: 'walker', c: 10, r: 12 }, { kind: 'snail', c: 12, r: 12 }];
+await say(teacher, { t: 'quali-open', stage: hard, rounds: 1, si: 0, easy: true });
+await say(phones[0], { t: 'level?' });
+const qEasy = last(phones[0], 'levels').quali;
+ok(last(teacher, 'room').quali.easy === true && last(phones[0], 'you').quali.easy === true, 'Qualifying „einfach“: Beamer und Handy wissen es');
+ok(qEasy.enemies.length === 0 && !/[x*]/.test(qEasy.rows.join('')) && qEasy.rows[13] === hard.rows[13], 'einfach: ohne Gegner, Stachelkugeln und Schleim, sonst gleich');
+await say(teacher, { t: 'quali-open', stage: hard, rounds: 1, si: 0 });
+await say(phones[0], { t: 'level?' });
+const qHard = last(phones[0], 'levels').quali;
+ok(last(teacher, 'room').quali.easy === false && qHard.enemies.length === 2 && qHard.rows[12] === hard.rows[12], 'schwer: das Level, wie es gebaut ist');
+await say(teacher, { t: 'final-setup', p: order.slice(0, 2).map((c) => c.pid), stages: [hard, hard], shared: true, easy: true });
+await say(order[0], { t: 'level?' });
+const fEasy = last(order[0], 'levels').final;
+ok(last(teacher, 'room').final.easy === true && last(order[0], 'you').final.easy === true, 'Finale „einfach“: Beamer und Handy wissen es');
+ok(fEasy.length === 2 && fEasy.every((st) => st.enemies.length === 0 && !/[x*]/.test(st.rows.join(''))), 'einfaches Finale: beide Level ohne Gegner, Stachelkugeln und Schleim');
+
 console.log('\n== Finale beenden und Sitzung löschen');
 await say(teacher, { t: 'final-setup', p: order.slice(0, 2).map((c) => c.pid), stages: [tiny('Eins'), tiny('Zwei')], shared: false });
 await say(teacher, { t: 'final-start' });

@@ -110,7 +110,9 @@ export class RoomLogic {
         const stage = E.normalizeStage(msg.stage, 0);
         if (!stage) return conn.send({ t: 'error', why: 'bad-level' });
         s.lv++;
-        s.quali = { stage, rounds: int(msg.rounds, 1, MAX_ROUNDS, 1), lv: s.lv, si: int(msg.si, 0, 99, 0) };
+        // Schwierigkeit: „einfach“ spielt das Level ohne Gegner, Stachelkugeln und Schleim (E.easyStage)
+        const easy = msg.easy === true;
+        s.quali = { stage: easy ? E.easyStage(stage) : stage, rounds: int(msg.rounds, 1, MAX_ROUNDS, 1), lv: s.lv, si: int(msg.si, 0, 99, 0), easy };
         if (msg.reset) { s.players = {}; s.order = []; }
         s.phase = 'quali'; s.final = null; this.race = null;
         await this.persist(); this.pushAll(); return;
@@ -170,17 +172,20 @@ export class RoomLogic {
     }
   }
 
-  // Finale aus der Nachricht der Lehrkraft: Spieler (2–4, in Startreihenfolge = Farbe), ein oder zwei Level, gemeinsames Level ja/nein
+  // Finale aus der Nachricht der Lehrkraft: Spieler (2–4, in Startreihenfolge = Farbe), ein oder zwei Level, gemeinsames Level ja/nein,
+  // Schwierigkeit einfach/schwer
   makeFinal(s, msg) {
     const p = Array.isArray(msg.p) ? msg.p.map(String) : [];
     if (p.length < MIN_FINAL || p.length > MAX_FINAL || new Set(p).size !== p.length || !p.every(pid => s.players[pid])) return null;
     const raw = Array.isArray(msg.stages) ? msg.stages.slice(0, 2) : [];
-    const stages = raw.map((st, i) => E.normalizeStage(st, i));
-    if (stages.length < 1 || stages.some(st => !st)) return null;
+    const easy = msg.easy === true;
+    const built = raw.map((st, i) => E.normalizeStage(st, i));
+    if (built.length < 1 || built.some(st => !st)) return null;
+    const stages = easy ? built.map(E.easyStage) : built;
     s.lv++;
     return {
       p, names: p.map(pid => s.players[pid].name), stages, si: Array.isArray(msg.si) ? msg.si.slice(0, stages.length).map(v => int(v, 0, 99, 0)) : stages.map((_, i) => i),
-      shared: !!msg.shared, lv: s.lv, state: 'ready', startAt: 0, fin: p.map(() => null), place: [], round: s.final ? s.final.round || 0 : 0, doneAt: 0,
+      shared: !!msg.shared, easy, lv: s.lv, state: 'ready', startAt: 0, fin: p.map(() => null), place: [], round: s.final ? s.final.round || 0 : 0, doneAt: 0,
     };
   }
 
@@ -332,12 +337,12 @@ export class RoomLogic {
   }
   quali() {
     const q = this.s.quali;
-    return q ? { name: q.stage.name, theme: q.stage.theme, rounds: q.rounds, lv: q.lv, si: q.si } : null;
+    return q ? { name: q.stage.name, theme: q.stage.theme, rounds: q.rounds, lv: q.lv, si: q.si, easy: !!q.easy } : null;
   }
   finalInfo(withPids) {
     const f = this.s.final; if (!f) return null;
     const out = {
-      names: f.names, stageNames: f.stages.map(st => st.name), shared: f.shared, lv: f.lv, state: f.state,
+      names: f.names, stageNames: f.stages.map(st => st.name), shared: f.shared, easy: !!f.easy, lv: f.lv, state: f.state,
       startAt: f.startAt, fin: f.fin, place: f.place, prog: f.prog || null, round: f.round, doneAt: f.doneAt, si: f.si, timeUp: !!f.timeUp,
     };
     if (withPids) { const on = this.online(); out.p = f.p; out.online = f.p.map(pid => on.has(pid)); }

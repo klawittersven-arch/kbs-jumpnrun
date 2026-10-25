@@ -114,6 +114,13 @@
   }
 
   // Sicht der Engine auf ein Level; die Zeilen bleiben Zeichenketten, gelesen als grid[r][c]
+  // Schwierigkeit „einfach“: dasselbe Level ohne Gegner (Käfer, Schnecken), ohne Stachelkugeln und ohne Schleim.
+  // „schwer“ ist das Level, wie es gebaut ist. Speed-Items, Kristalle, Lücken und Lifte bleiben.
+  function easyStage(s) {
+    if (!s) return s;
+    return Object.assign({}, s, { rows: s.rows.map((row) => row.replace(/[x*]/g, ".")), enemies: [] });
+  }
+
   function stageView(d) {
     return {
       name: d.name, theme: d.theme, cols: d.cols, grid: d.rows,
@@ -884,7 +891,7 @@
   return {
     T, VW, VH, ROWS, PH, SMALL_H, BIG_H, SOLID, TILE_CHARS, MIN_COLS, MAX_COLS, MAX_ENEMIES, MAX_LIFTS, NAME_MAX, MAX_STAGES,
     LIFT_W, LIFT_H, LIFT_V, LIFT_LOOP, THEMES, ENEMY_KINDS, STAGE_PAUSE, RESPAWN_AFTER, REGROW, SPEED_T, SLIME_AFTER, SLIME_MAX, SPIKE_IN, FINAL_FRAMES, FINAL_WARN, QUALI_FRAMES, QUALI_WARN,
-    normalizeStage, normalizeLibrary, stageView, buildStages,
+    normalizeStage, normalizeLibrary, easyStage, stageView, buildStages,
     makePlayer, createWorld, createSoloWorld, addPlayer, removePlayer, cloneWorld, tileAt, stepWorld,
     BIT, encodeInput, decodeInput, inputChar, charInput,
     createMatch, stepMatch, cloneMatch, progressOf, reachOf, scoreOf, worldFor, createSync,
