@@ -15,6 +15,7 @@
   I.walkOnly = true;
   I.enabled = false;
   I.attachPad($("#dpad"), $("#tJump"));
+  I.guardZoom(game);
   const view = G.makeView($("#screen"));
   let race = null, si = 0;
 

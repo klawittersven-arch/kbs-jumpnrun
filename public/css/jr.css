@@ -18,6 +18,9 @@
 }
 *{box-sizing:border-box}
 html,body{min-height:100%}
+/* iPhone (Safari): Doppeltippen zoomt sonst ins Bild, etwa wenn man schnell hintereinander „Springen“ drückt.
+   manipulation verbietet nur das Doppeltipp-Zoomen; Scrollen und Zoomen mit zwei Fingern gehen weiter. */
+html{touch-action:manipulation}
 body{margin:0;background:var(--room);color:var(--text);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 [hidden]{display:none!important}
 h1,h2,h3,p{margin:0}
@@ -87,7 +90,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .flist li{display:flex;align-items:center;gap:10px}
 
 /* Spielansicht */
-.game{display:grid;gap:10px;justify-items:center}
+.game{display:grid;gap:10px;justify-items:center;touch-action:pan-y} /* im Spiel nur senkrecht scrollen, kein Zoom */
 .hudbar{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bezel);border-radius:10px;padding:8px 12px}
 .hud-time{font:700 clamp(1.05em,5.6vw,1.5em)/1 var(--f-pixel);color:var(--led);font-variant-numeric:tabular-nums;white-space:nowrap}
 .hud-info{min-width:0;font:700 .8em/1.2 var(--f-pixel);letter-spacing:.06em;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

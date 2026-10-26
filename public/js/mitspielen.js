@@ -13,6 +13,7 @@
   if (matchMedia("(hover: none) and (pointer: coarse)").matches) document.body.classList.add("touch");
   I.walkOnly = true;
   I.attachPad($("#dpad"), $("#tJump"));
+  I.guardZoom(gameEl);
   const view = G.makeView($("#screen"));
 
   let code = decodeURIComponent((location.hash || "").slice(1)).toUpperCase().replace(/[^A-Z0-9]/g, "");

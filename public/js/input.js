@@ -129,8 +129,37 @@
     return bits;
   }
 
+  // iPhone/iPad (Safari): schnelles Tippen auf „Springen“ darf nicht ins Bild zoomen. Das CSS (touch-action) verhindert
+  // das meist schon; manche Safari-Versionen zoomen trotzdem. Deshalb im Spielbereich zusätzlich:
+  //  - zwei Berührungen kurz hintereinander lösen kein Doppeltipp-Zoomen aus (außer auf Knöpfen, die sollen klicken),
+  //  - das Zoomen mit zwei Fingern ist gesperrt, solange das Spiel zu sehen ist,
+  //  - ist doch gezoomt worden, springt die Ansicht beim nächsten Druck auf die Steuerung auf 100 % zurück.
+  function guardZoom(game) {
+    const visible = () => !game.hidden;
+    let last = 0;
+    game.addEventListener("touchend", (e) => {
+      const quick = e.timeStamp - last < 450;
+      last = e.timeStamp;
+      if (quick && !(e.target.closest && e.target.closest("button,a,input,label,select,textarea"))) e.preventDefault();
+    }, { passive: false });
+    game.addEventListener("dblclick", (e) => e.preventDefault());
+    for (const t of ["gesturestart", "gesturechange"]) document.addEventListener(t, (e) => { if (visible()) e.preventDefault(); }, { passive: false });
+    game.addEventListener("pointerdown", () => resetZoom());
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", () => { if (visible()) resetZoom(); });
+  }
+  // Zoom zurücksetzen: kurz die größte Vergrößerung auf 1 setzen, danach wieder wie vorher (so lässt Safari den Zoom los)
+  let resetting = false;
+  function resetZoom() {
+    const vv = window.visualViewport, meta = document.querySelector('meta[name="viewport"]');
+    if (resetting || !vv || !meta || vv.scale <= 1.02) return;
+    resetting = true;
+    const orig = meta.getAttribute("content");
+    meta.setAttribute("content", orig + ",maximum-scale=1");
+    setTimeout(() => { meta.setAttribute("content", orig); resetting = false; }, 350);
+  }
+
   window.JRI = {
-    attachPad, sample, releaseAll, pollGamepad, isDown,
+    attachPad, guardZoom, sample, releaseAll, pollGamepad, isDown,
     set walkOnly(v) { walkOnly = !!v; },
     get walkOnly() { return walkOnly; },
     set enabled(v) { enabled = !!v; if (!enabled) releaseAll(); },
