@@ -76,6 +76,7 @@
     };
     area.addEventListener("pointerdown", (e) => {
       e.preventDefault();
+      clearSelection();
       try { area.setPointerCapture(e.pointerId); } catch (err) { /* künstlicher Zeiger */ }
       set(e.pointerId, onFinger(e, area.getBoundingClientRect()));
     });
@@ -86,7 +87,22 @@
     area.addEventListener("pointercancel", end);
     area.addEventListener("lostpointercapture", end);
     area.addEventListener("contextmenu", (e) => e.preventDefault());
+    // iPhone: langes Drücken soll weder Text markieren noch die Lupe oder „Kopieren/Ausschneiden“ öffnen
+    area.addEventListener("touchstart", (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
   }
+
+  // Eine Textauswahl (falls Safari doch eine begonnen hat) beim Drücken der Steuerung aufheben, außer beim Tippen in ein Feld
+  function clearSelection() {
+    try {
+      const s = getSelection();
+      if (s && s.rangeCount && !isTyping(document.activeElement)) s.removeAllRanges();
+    } catch (err) { /* ältere Browser */ }
+  }
+  // Außerhalb der Lehrerseite gar nicht erst mit dem Markieren beginnen (Eingabefelder ausgenommen)
+  document.addEventListener("selectstart", (e) => {
+    const t = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
+    if (!document.body.classList.contains("teacher") && !isTyping(t)) e.preventDefault();
+  });
   function attachPad(dpad, jump) {
     if (dpad) bindTouch(dpad, (e, r) => {
       const dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);

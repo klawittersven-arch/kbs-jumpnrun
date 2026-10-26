@@ -21,6 +21,11 @@ html,body{min-height:100%}
 /* iPhone (Safari): Doppeltippen zoomt sonst ins Bild, etwa wenn man schnell hintereinander „Springen“ drückt.
    manipulation verbietet nur das Doppeltipp-Zoomen; Scrollen und Zoomen mit zwei Fingern gehen weiter. */
 html{touch-action:manipulation}
+/* iPhone (Safari): langes Drücken, etwa auf „Springen“, markiert sonst Text (z. B. „Ton“ oben in der Leiste) und öffnet
+   „Kopieren/Ausschneiden“. Auf Übungs- und Mitspielseite ist Text deshalb nicht markierbar; Eingabefelder bleiben normal
+   bedienbar. Die Lehrerseite ist ausgenommen. */
+body:not(.teacher){-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body:not(.teacher) input,body:not(.teacher) textarea,body:not(.teacher) select{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 body{margin:0;background:var(--room);color:var(--text);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 [hidden]{display:none!important}
 h1,h2,h3,p{margin:0}
