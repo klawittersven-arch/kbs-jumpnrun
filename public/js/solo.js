@@ -11,7 +11,9 @@
   let isEasy = U.store("jr.solo.easy") !== false;
   const stagesNow = () => (isEasy ? easy : hard);
   const home = $("#home"), game = $("#game"), msg = $("#msg");
-  if (matchMedia("(hover: none) and (pointer: coarse)").matches) document.body.classList.add("touch");
+  // Steuerkreuz und „Springen“ auf allen Touch-Geräten (siehe input.js); erscheinen sie erst mitten im Spiel, das Spiel ins Bild holen
+  I.onTouch = () => { if (!$("#game").hidden) $("#game").scrollIntoView({ block: "start" }); };
+  I.setupTouch();
   I.walkOnly = true;
   I.enabled = false;
   I.attachPad($("#dpad"), $("#tJump"));

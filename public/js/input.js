@@ -174,8 +174,31 @@
     setTimeout(() => { meta.setAttribute("content", orig); resetting = false; }, 350);
   }
 
+  // Steuerkreuz und „Springen“ zeigen (CSS-Klasse „touch“ am body), sobald das Gerät einen Touchscreen hat.
+  // Die Abfrage (hover: none) and (pointer: coarse) allein reicht nicht: manche Android-Handys melden „Maus mit Hover“
+  // (etwa mit Stift, mit verbundener Bluetooth-Tastatur oder Maus, in manchen Browsern) und bekämen sonst keine
+  // Steuerung zu sehen. Deshalb zählen auch Touchpunkte und Touch-Ereignisse, und spätestens die erste Berührung
+  // des Bildschirms blendet die Steuerung ein.
+  function hasTouchScreen() {
+    const mq = (q) => { try { return matchMedia(q).matches; } catch (err) { return false; } };
+    return mq("(hover: none) and (pointer: coarse)") || mq("(any-pointer: coarse)") ||
+      (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
+  }
+  function setupTouch() {
+    const on = () => {
+      if (document.body.classList.contains("touch")) return;
+      document.body.classList.add("touch");
+      if (touchHook) touchHook();
+    };
+    if (hasTouchScreen()) on();
+    addEventListener("touchstart", on, { passive: true, capture: true });
+    addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" || e.pointerType === "pen") on(); }, { passive: true, capture: true });
+  }
+  let touchHook = null;
+
   window.JRI = {
-    attachPad, guardZoom, sample, releaseAll, pollGamepad, isDown,
+    attachPad, guardZoom, setupTouch, sample, releaseAll, pollGamepad, isDown,
+    set onTouch(fn) { touchHook = fn; },
     set walkOnly(v) { walkOnly = !!v; },
     get walkOnly() { return walkOnly; },
     set enabled(v) { enabled = !!v; if (!enabled) releaseAll(); },

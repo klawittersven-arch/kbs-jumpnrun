@@ -83,7 +83,15 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
     const names = [["Lena", "k"], ["Mehmet", "ö"], ["Zoë", "m"], ["Jonas", "b"]];
     const phones = [];
     for (let i = 0; i < 4; i++) {
-      const ctx = await browser.newContext(i === 0 ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 } : { viewport: { width: 420, height: 860 } });
+      // Lena: Handy mit Touch; Mehmet: Android-Handy mit Touch, das sich wie mit Maus meldet (Stift, Bluetooth-Tastatur);
+      // Zoë und Jonas: Laptop ohne Touch
+      const ctx = await browser.newContext(i === 0 ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 }
+        : i === 1 ? { viewport: { width: 412, height: 860 }, hasTouch: true } : { viewport: { width: 420, height: 860 } });
+      if (i === 1) await ctx.addInitScript(() => {
+        const orig = window.matchMedia.bind(window);
+        const fake = (q, m) => ({ matches: m, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return false; } });
+        window.matchMedia = (q) => (/hover:\s*none|pointer:\s*coarse/.test(q) ? fake(q, false) : /hover:\s*hover|pointer:\s*fine/.test(q) ? fake(q, true) : orig(q));
+      });
       const p = await ctx.newPage();
       watch(p, names[i][0]);
       await p.goto(BASE + "/mitspielen#" + code);
@@ -105,6 +113,9 @@ const LIB = { version: 1, stages: [tiny("Probe", "clinic"), tiny("Eis", "glacier
       await sleep(80);
     }
     await shot(phones[0], "2-handy-countdown");
+    const padOn = (p) => p.evaluate(() => ["#dpad", "#tJump"].every((q) => { const e = document.querySelector(q), r = e.getBoundingClientRect(); return getComputedStyle(e).display !== "none" && r.height > 0 && r.bottom <= innerHeight; }));
+    ok(await padOn(phones[0]) && await padOn(phones[1]), "Steuerkreuz und „Springen“ auf beiden Touch-Handys ganz im Bild, auch wenn sich das Handy wie mit Maus meldet");
+    ok(!(await padOn(phones[2])), "am Laptop ohne Touch keine Touch-Steuerung");
     await sleep(3000);
     await Promise.all(phones.map(async (p, i) => {
       await sleep(i * 400);

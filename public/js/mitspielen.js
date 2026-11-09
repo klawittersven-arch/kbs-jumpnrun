@@ -10,7 +10,9 @@
   const INIT_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ]$/;
   const COLOR_NAMES = G.COLORS.map((c) => c.name);
 
-  if (matchMedia("(hover: none) and (pointer: coarse)").matches) document.body.classList.add("touch");
+  // Steuerkreuz und „Springen“ auf allen Touch-Geräten (siehe input.js); erscheinen sie erst mitten im Spiel, das Spiel ins Bild holen
+  I.onTouch = () => { if (!$("#game").hidden) $("#game").scrollIntoView({ block: "start" }); };
+  I.setupTouch();
   I.walkOnly = true;
   I.attachPad($("#dpad"), $("#tJump"));
   I.guardZoom(gameEl);
